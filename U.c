@@ -16,9 +16,11 @@ struct{
     char *fifoname;
 }typedef args ;
 
+//por alguma razão o gettid não estava definido
 pid_t gettid(){
     return syscall(SYS_gettid);
 }
+
 pthread_mutex_t add_i = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t write_fifo = PTHREAD_MUTEX_INITIALIZER;
 struct timeval *startTime;
@@ -99,16 +101,38 @@ int main(int argc, char **argv)
 }
 
 void *utilizador(){
-    srand(time(NULL));
-    int time=rand()%49+1;
+
+    //gera tempo aleatório
+    unsigned seed=time(NULL);
+    int dur=rand_r(&seed)%49+1;
+
+    //incrementa o i, apenas um pode aceder de cada vez
     pthread_mutex_lock(&add_i);
     i++;
     pthread_mutex_unlock(&add_i);
-    request tmp={i,getpid(),gettid(),time,-1};
+
+    //cria a struct request que vai ser enviada para o fifo
+    request tmp={i,getpid(),gettid(),dur,-1};
+
+    //cria o fifo privado
+    int private_fifo;
+    char fifo_name[24];
+    sprintf(fifo_name,"%i.%i",getpid(),gettid());
+    mkfifo(fifo_name,0600); //criar a fifo publica
+    private_fifo=open(fifo_name,O_RDONLY);
+
+    //bloqueia o acesso ao fifo, apenas um thread de cada vez pode escrever
     pthread_mutex_lock(&write_fifo);
     write(fifo,&tmp,sizeof(tmp));
     pthread_mutex_unlock(&write_fifo);
-    printf("ola\n");
+
+    //lê do fifo_privado
+    read(private_fifo,&tmp,sizeof(tmp));
+    
+    //printf("ola\n");
+    close(private_fifo);
+    if(unlink(fifo_name))
+        printf("%s\n",strerror(errno));
     return NULL;
 }
 
