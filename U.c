@@ -70,11 +70,14 @@ void load_args(int argc, char **argv){
     }
 }
 
+pthread_t *queue;
 void init(int argc, char **argv){
     startTime=malloc(sizeof(struct timeval));
     gettimeofday(startTime,0);
     load_args(argc,argv);
+    queue=malloc(sizeof(pthread_t)*10000);
 }
+int arr_size=0;
 
 void *utilizador();
 int i=0;
@@ -92,8 +95,19 @@ int main(int argc, char **argv)
         msleep(1);
         pthread_t t;
         pthread_create(&t,NULL,utilizador,NULL);
+	
+	//queue thread
+	queue[arr_size++]=t;
+	if(arr_size>9999)
+		fprintf(stderr,"%i\n",arr_size);
     }
 
+    //free threads
+    while(arr_size){
+	pthread_join(queue[arr_size--],NULL);
+    }
+
+    printf("%i\n",arr_size);
     close(fifo);
     if((unlink(arguments.fifoname)))
         printf("%s\n",strerror(errno));
