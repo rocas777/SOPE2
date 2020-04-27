@@ -102,16 +102,16 @@ int main(int argc, char **argv)
         if((err=pthread_create(&t,NULL,utilizador,NULL)))
 		printf("%i\n",err);
 	threads++;    //free threads
+
+	//limitar o num de threads por causa dos ficheiros abertos
 	if(threads>1020){
     		pthread_mutex_lock(&add_queue);
    		while(arr_size){
-			pthread_mutex_lock(&add_queue);
 			while(arr_size){
 				pthread_join(queue[--arr_size],NULL);
+				threads--;
     			}
-    			pthread_mutex_unlock(&add_queue);
     		}
-		threads=0;
     		pthread_mutex_unlock(&add_queue);
 	}
     }
