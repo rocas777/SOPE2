@@ -23,6 +23,7 @@ pid_t gettid(){
 
 pthread_mutex_t add_i = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t write_fifo = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t add_queue = PTHREAD_MUTEX_INITIALIZER;
 struct timeval *startTime;
 args arguments;
 
@@ -71,51 +72,80 @@ void load_args(int argc, char **argv){
 }
 
 pthread_t *queue;
+int max=100;
 void init(int argc, char **argv){
     startTime=malloc(sizeof(struct timeval));
     gettimeofday(startTime,0);
     load_args(argc,argv);
-    queue=malloc(sizeof(pthread_t)*10000);
+    queue=malloc(sizeof(pthread_t)*max);
 }
 int arr_size=0;
 
 void *utilizador();
 int i=0;
-int fifo;
+FILE *fifo;
 int main(int argc, char **argv)
 {
     init(argc,argv);
 
     mkfifo(arguments.fifoname,0600); //criar a fifo publica
-    fifo=open(arguments.fifoname,O_NONBLOCK); //abre a fifo pública
+    fifo=fopen(arguments.fifoname,"w"); //abre a fifo pública
 
     //loop principal
+    printf("Started\n");
     double t=0;
+    int threads=0;
     while ((t=timeSinceStartTime())/1000<arguments.secs) {
         msleep(1);
         pthread_t t;
-        pthread_create(&t,NULL,utilizador,NULL);
-	
-	//queue thread
-	queue[arr_size++]=t;
-	if(arr_size>9999)
-		fprintf(stderr,"%i\n",arr_size);
+	int err;
+        if((err=pthread_create(&t,NULL,utilizador,NULL)))
+		printf("%i\n",err);
+	threads++;    //free threads
+	if(threads>1020){
+    		pthread_mutex_lock(&add_queue);
+   		while(arr_size){
+			pthread_mutex_lock(&add_queue);
+			while(arr_size){
+				pthread_join(queue[--arr_size],NULL);
+    			}
+    			pthread_mutex_unlock(&add_queue);
+    		}
+		threads=0;
+    		pthread_mutex_unlock(&add_queue);
+	}
     }
+    printf("Thread creation Ended\n");
 
     //free threads
+    pthread_mutex_lock(&add_queue);
     while(arr_size){
-	pthread_join(queue[arr_size--],NULL);
+	pthread_mutex_lock(&add_queue);
+	while(arr_size){
+		pthread_join(queue[--arr_size],NULL);
+    	}
+    	pthread_mutex_unlock(&add_queue);
     }
+    pthread_mutex_unlock(&add_queue);
 
-    printf("%i\n",arr_size);
-    close(fifo);
+    printf("Program Ended\n");
+    fclose(fifo);
     if((unlink(arguments.fifoname)))
         printf("%s\n",strerror(errno));
     return 0;
 }
 
 void *utilizador(){
+    pthread_mutex_lock(&add_queue);
+    queue[arr_size++]=pthread_self();
+    if(arr_size>=max){
+		queue=realloc(queue,max*10*sizeof(pthread_t));
+		max*=10;    
+		printf("queue resized: %i %lu\n",max,sizeof(pthread_t));
+    }
+    pthread_mutex_unlock(&add_queue);
 
+    //int u=0;
     //gera tempo aleatório
     unsigned seed=time(NULL);
     int dur=rand_r(&seed)%49+1;
@@ -124,29 +154,43 @@ void *utilizador(){
     pthread_mutex_lock(&add_i);
     i++;
     pthread_mutex_unlock(&add_i);
-
     //cria a struct request que vai ser enviada para o fifo
     request tmp={i,getpid(),gettid(),dur,-1};
+    printf("% i %i %i %f %i\n",tmp.i,tmp.pid,tmp.tid,tmp.dur,tmp.pl); 
 
     //cria o fifo privado
-    int private_fifo;
-    char fifo_name[24];
+    FILE *private_fifo;
+    char fifo_name[50];
     sprintf(fifo_name,"%i.%i",getpid(),gettid());
-    mkfifo(fifo_name,0600); //criar a fifo publica
-    private_fifo=open(fifo_name,O_RDONLY);
+    mkfifo(fifo_name,0600); //criar a fifo privada
 
     //bloqueia o acesso ao fifo, apenas um thread de cada vez pode escrever
     pthread_mutex_lock(&write_fifo);
-    write(fifo,&tmp,sizeof(tmp));
+    fwrite(&tmp,sizeof(request),1,fifo);
     pthread_mutex_unlock(&write_fifo);
+    //printf("Escreveu\n");
+
+    //abre o fifo privado
+    private_fifo=fopen(fifo_name,"r");
+    //printf("Abriu\n");
+
+
+
+    
 
     //lê do fifo_privado
-    read(private_fifo,&tmp,sizeof(tmp));
+    fread(&tmp,sizeof(request),1,private_fifo);
+    printf("Passou\n");
     
-    //printf("ola\n");
-    close(private_fifo);
+    
+    if(fclose(private_fifo))
+        printf("Erro 1:%s\n",strerror(errno));	
+    sprintf(fifo_name,"%i.%i",getpid(),gettid());
     if(unlink(fifo_name))
-        printf("%s\n",strerror(errno));
+        printf("Erro 2:%s\n",strerror(errno));
+    printf("\n\n");
+	
+    //queue thread	
     return NULL;
 }
 
