@@ -130,6 +130,8 @@ int main(int argc, char **argv)
 
     printf("Program Ended\n");
     fclose(fifo);
+    free(startTime);
+    free(queue);
     if((unlink(arguments.fifoname)))
         printf("%s\n",strerror(errno));
     return 0;

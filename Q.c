@@ -26,6 +26,8 @@ pthread_mutex_t write_fifo = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t add_queue = PTHREAD_MUTEX_INITIALIZER;
 struct timeval *startTime;
 args arguments;
+pthread_t *queue;
+int max=100;
 
 int msleep(long tms)
 {
@@ -71,8 +73,6 @@ void load_args(int argc, char **argv){
     }
 }
 
-pthread_t *queue;
-int max=100;
 void init(int argc, char **argv){
     startTime=malloc(sizeof(struct timeval));
     gettimeofday(startTime,0);
@@ -84,6 +84,7 @@ int arr_size=0;
 void *utilizador();
 int i=0;
 FILE *fifo;
+
 int main(int argc, char **argv)
 {
     init(argc,argv);
@@ -93,9 +94,12 @@ int main(int argc, char **argv)
     fifo=fopen(arguments.fifoname,"r"); //abre a fifo pública
     printf("Opened\n");
     while(fread(&input,sizeof(input),1,fifo)){
-	printf("ok\n");
-	printf("% i %i %i %f %i\n",input.i,input.pid,input.tid,input.dur,input.pl); 
+        printf("ok\n");
+        printf("% i %i %i %f %i\n",input.i,input.pid,input.tid,input.dur,input.pl); 
     }
+    free(startTime);
+    free(queue);
+    return 0;
 }
 
 
