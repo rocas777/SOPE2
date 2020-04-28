@@ -11,6 +11,9 @@
 #include <unistd.h>
 #include "types.h"
 #include <sys/syscall.h>
+
+#define ATTEMPTS 1000000
+
 struct{
     long unsigned secs;
     char *fifoname;
@@ -20,6 +23,19 @@ struct{
 pid_t gettid(){
     return syscall(SYS_gettid);
 }
+
+void delay(int number_of_seconds) 
+{ 
+    // Converting time into milli_seconds 
+    int milli_seconds = 1000 * number_of_seconds; 
+  
+    // Storing start time 
+    clock_t start_time = clock(); 
+  
+    // looping till required time is not achieved 
+    while (clock() < start_time + milli_seconds) 
+        ; 
+} 
 
 pthread_mutex_t add_i = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t write_fifo = PTHREAD_MUTEX_INITIALIZER;
@@ -81,25 +97,50 @@ void init(int argc, char **argv){
 }
 int arr_size=0;
 
-void *utilizador();
+void *processRequest();
 int i=0;
 FILE *fifo;
+request input;
 
 int main(int argc, char **argv)
 {
-    init(argc,argv);
-    request input;	
+    delay(1);   // Atrasa o Q.c para dar tempo ao U.c para criar a FIFO (teremos de usar uma alternativa)
+    init(argc,argv);	
+    pthread_t t;
+    size_t test;
+    int i = 0;
 
     printf("Tentou\n");
-    fifo=fopen(arguments.fifoname,"r"); //abre a fifo pública
+    fifo = fopen(arguments.fifoname,"r"); //abre a fifo pública
+    if( fifo == NULL ){
+        perror("ERROR opening FIFO (at Q.c) ");
+        exit(errno); 
+    }
     printf("Opened\n");
-    while(fread(&input,sizeof(input),1,fifo)){
-        printf("ok\n");
-        printf("% i %i %i %f %i\n",input.i,input.pid,input.tid,input.dur,input.pl); 
+    while(i < ATTEMPTS){
+        usleep(1 * 1000);
+        if(fread(&input,sizeof(input),1,fifo)){
+            printf("OK - (Q.c) % i %i %i %f %i\n",input.i,input.pid,input.tid,input.dur,input.pl); 
+            pthread_create(&t,NULL, processRequest,NULL);
+            pthread_join(t, NULL);
+        }
     }
     free(startTime);
     free(queue);
     return 0;
 }
 
+void *processRequest(){
+    FILE* tmp;
+    char fifoLoad[25];
+    sprintf(fifoLoad, "%d.%d", input.pid, input.tid);
+    tmp = fopen(fifoLoad, "w");
 
+    // THE FOLLOWING NEEDS TO BE MODIFIED - IT IS ACTING MERELY AS A PLACEHOLDER SO THE CODE DOESN'T BLOCK
+        char stringRet[10] = "Okay";
+        fwrite(stringRet, strlen(stringRet)+1, 1, fifo);
+    
+    fclose(tmp);
+
+    return NULL;
+}
