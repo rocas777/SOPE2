@@ -91,11 +91,7 @@ int fifo;;
 int main(int argc, char **argv){
     init(argc,argv);
 
-    if( mkfifo(arguments.fifoname,0600) < 0 ){
-        //Cria a fifo publica e analiza se é válida.
-        perror("ERROR setting up FIFO on main() of U.c ");
-        exit(errno); 
-    } 
+ 
     fifo = open(arguments.fifoname,O_WRONLY); //abre a fifo pública
 
     

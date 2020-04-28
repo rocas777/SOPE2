@@ -94,6 +94,12 @@ void init(int argc, char **argv){
     gettimeofday(startTime,0);
     load_args(argc,argv);
     queue=malloc(sizeof(pthread_t)*max);
+
+    if( mkfifo(arguments.fifoname,0600) < 0 ){
+        //Cria a fifo publica e analiza se é válida.
+        perror("ERROR setting up FIFO on main() of U.c ");
+        //exit(errno); 
+    }
 }
 int arr_size=0;
 
