@@ -86,7 +86,7 @@ int arr_size=0;
 
 void *utilizador();
 int i=0;
-FILE *fifo;
+int fifo;;
 
 int main(int argc, char **argv){
     init(argc,argv);
@@ -96,11 +96,8 @@ int main(int argc, char **argv){
         perror("ERROR setting up FIFO on main() of U.c ");
         exit(errno); 
     } 
-    fifo = fopen(arguments.fifoname,"w"); //abre a fifo pública
-    if( fifo == NULL ){
-        perror("ERROR opening FIFO (at U.c) ");
-        exit(errno); 
-    }
+    fifo = open(arguments.fifoname,O_WRONLY); //abre a fifo pública
+
     
     printf("FIFO at '%s' created and opened with success!\n", arguments.fifoname);
 
@@ -143,7 +140,7 @@ int main(int argc, char **argv){
     pthread_mutex_unlock(&add_queue);
 
     printf("Program Ended\n");
-    fclose(fifo);
+    close(fifo);
     free(startTime);
     free(queue);
     if((unlink(arguments.fifoname))){
@@ -164,7 +161,7 @@ void *utilizador(){
 
     //int u=0;
     //gera tempo aleatório
-    unsigned seed=time(NULL);
+    unsigned seed=time(NULL)+i;
     int dur=rand_r(&seed)%49+1;
 
     //incrementa o i, apenas um pode aceder de cada vez
@@ -190,13 +187,13 @@ void *utilizador(){
 
     //bloqueia o acesso ao fifo, apenas um thread de cada vez pode escrever
     pthread_mutex_lock(&write_fifo);
-        fwrite(&tmp,sizeof(request),1,fifo);
+        write(fifo,&tmp,sizeof(request));
     pthread_mutex_unlock(&write_fifo);
     //printf("Escreveu\n");
 
     //abre o fifo privado
         private_fifo = fopen(fifo_name,"r");
-        if( fifo == NULL ){
+        if( private_fifo == NULL ){
             perror("ERROR opening private_fifo ( at U.c in utilizador() ) ");
             exit(errno); 
         }

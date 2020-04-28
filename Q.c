@@ -107,9 +107,6 @@ int main(int argc, char **argv)
     delay(1);   // Atrasa o Q.c para dar tempo ao U.c para criar a FIFO (teremos de usar uma alternativa)
     init(argc,argv);	
     pthread_t t;
-    size_t test;
-    int i = 0;
-
     printf("Tentou\n");
     fifo = fopen(arguments.fifoname,"r"); //abre a fifo pública
     if( fifo == NULL ){
@@ -117,13 +114,10 @@ int main(int argc, char **argv)
         exit(errno); 
     }
     printf("Opened\n");
-    while(i < ATTEMPTS){
-        usleep(1 * 1000);
-        if(fread(&input,sizeof(input),1,fifo)){
+    while(fread(&input,sizeof(input),1,fifo)){
             printf("OK - (Q.c) % i %i %i %f %i\n",input.i,input.pid,input.tid,input.dur,input.pl); 
             pthread_create(&t,NULL, processRequest,NULL);
             pthread_join(t, NULL);
-        }
     }
     free(startTime);
     free(queue);
