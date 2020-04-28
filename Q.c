@@ -105,7 +105,7 @@ int arr_size=0;
 
 void *processRequest();
 int i=0;
-FILE *fifo;
+int fifo;
 request input;
 
 int main(int argc, char **argv)
@@ -114,13 +114,9 @@ int main(int argc, char **argv)
     init(argc,argv);	
     pthread_t t;
     printf("Tentou\n");
-    fifo = fopen(arguments.fifoname,"r"); //abre a fifo pública
-    if( fifo == NULL ){
-        perror("ERROR opening FIFO (at Q.c) ");
-        exit(errno); 
-    }
+    fifo = open(arguments.fifoname,O_RDONLY); //abre a fifo pública
     printf("Opened\n");
-    while(fread(&input,sizeof(input),1,fifo)){
+    while(read(fifo,&input,sizeof(input))){
             printf("OK - (Q.c) % i %i %i %f %i\n",input.i,input.pid,input.tid,input.dur,input.pl); 
             pthread_create(&t,NULL, processRequest,NULL);
             pthread_join(t, NULL);
@@ -138,7 +134,7 @@ void *processRequest(){
 
     // THE FOLLOWING NEEDS TO BE MODIFIED - IT IS ACTING MERELY AS A PLACEHOLDER SO THE CODE DOESN'T BLOCK
         char stringRet[10] = "Okay";
-        fwrite(stringRet, strlen(stringRet)+1, 1, fifo);
+        write(fifo,stringRet, strlen(stringRet)+1);
     
     fclose(tmp);
 

@@ -127,11 +127,7 @@ int main(int argc, char **argv){
     //free threads
     pthread_mutex_lock(&add_queue);
     while(arr_size){
-        pthread_mutex_lock(&add_queue);
-        while(arr_size){
             pthread_join(queue[--arr_size],NULL);
-        }
-    	pthread_mutex_unlock(&add_queue);
     }
     pthread_mutex_unlock(&add_queue);
 
