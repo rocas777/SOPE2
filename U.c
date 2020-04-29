@@ -35,9 +35,15 @@ bool file_exists (char *filename) {
 pthread_mutex_t add_i = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t write_fifo = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t add_queue = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t t_queue = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t tvar = PTHREAD_COND_INITIALIZER;
+
+pthread_cond_t cvar = PTHREAD_COND_INITIALIZER;
+
 struct timeval *startTime;
 args arguments;
 
+long u=0;
 int msleep(long tms)
 {
     struct timespec ts;
@@ -49,8 +55,8 @@ int msleep(long tms)
         return -1;
     }
 
-    ts.tv_sec = tms / 1000;
-    ts.tv_nsec = (tms % 1000) * 1000000;
+    ts.tv_sec = tms / 1000000;
+    ts.tv_nsec = (tms % 1000000) * 1000000000;
 
     do
     {
@@ -104,6 +110,7 @@ int fifo;
 
 int out=1;
 
+int threads = 0;
 int main(int argc, char **argv)
 {
     init(argc, argv);
@@ -117,44 +124,32 @@ int main(int argc, char **argv)
     //printf("Started\n");
     fflush(stdout);
     double t = 0;
-    int threads = 0;
     while ((t = timeSinceStartTime()) / 1000 < arguments.secs && out)
     {
-        msleep(1);
-        pthread_t t;
+        msleep(100);
+	pthread_t t;
         int err;
-        if ((err = pthread_create(&t, NULL, utilizador, NULL)))
-            printf("%i\n", err);
-        threads++; //free threads
+	pthread_mutex_lock(&t_queue);
+		threads++;
+		if(threads>2000)
+			pthread_cond_wait(&tvar, &t_queue);
+	pthread_mutex_unlock(&t_queue);
 
-        //limitar o num de threads por causa dos ficheiros abertos
-        if (threads > 10)
-        {
-            pthread_mutex_lock(&add_queue);
-            while (arr_size)
-            {
-                pthread_join(queue[--arr_size], NULL);
-                threads--;
-            }
-            pthread_mutex_unlock(&add_queue);
-        }
+        while ((err = pthread_create(&t, NULL, utilizador, NULL))){
+            printf("Erro 1: %i\n", threads);
+	    msleep(1000);	
+	}
+	if(i>u)
+		u=i;
+
     }
     //printf("Thread creation Ended\n");
 
     //free threads
-    //msleep(10);
-    while (arr_size)
-    {
-        pthread_mutex_lock(&add_queue);
-        if(arr_size){
-            pthread_join(queue[--arr_size], NULL);
-            threads--;
-        }
-        pthread_mutex_unlock(&add_queue);
-    }
-    printf("%i\n",threads);
+    msleep(10);
+    printf("Erro 2: %i\n",threads);
 
-    //printf("Program Ended\n");
+    printf("Program Ended %li\n",u);
 
     close(fifo);
     free(startTime);
@@ -164,6 +159,7 @@ int main(int argc, char **argv)
 
 void *utilizador()
 {
+
     //int u=0;
     //gera tempo aleatório
     unsigned seed = time(NULL) + i;
@@ -197,18 +193,6 @@ void *utilizador()
     //printf("Be -% i %i %i %f %i\n", tmp.i, tmp.pid, tmp.tid, tmp.dur, tmp.pl);
     if(!file_exists(arguments.fifoname) || write(fifo, &tmp, sizeof(request))==-1  ){
         //printf("erro 2 %i\n",tmp.i);
-        pthread_mutex_lock(&add_queue);
-        printf("ERRO\n");
-        fflush(stdout);
-        out=0;
-        queue[arr_size++] = pthread_self();
-        if (arr_size >= max)
-        {
-            queue = realloc(queue, max * 10 * sizeof(pthread_t));
-            max *= 10;
-            //printf("queue resized: %i %lu\n", max, sizeof(pthread_t));
-        }
-        pthread_mutex_unlock(&add_queue);
         pthread_exit(NULL);
     }
     //printf("Wrote\n");
@@ -222,6 +206,11 @@ void *utilizador()
 
     //lê do fifo_privado
     //msleep(10);
+    pthread_mutex_lock(&add_queue);
+	if(arr_size>= 1000)
+		pthread_cond_wait(&cvar, &add_queue);
+	arr_size++;
+    pthread_mutex_unlock(&add_queue);
     if((private_fifo = open(fifo_name, O_RDONLY))==-1)
         perror("erro\n");
     fflush(stdout);
@@ -231,24 +220,24 @@ void *utilizador()
 
 
     if (unlink(fifo_name))
-        printf("Erro 2 (com '%s'): %s\n", fifo_name, strerror(errno));
+        printf("Erro 3 (com '%s'): %s\n", fifo_name, strerror(errno));
 
     if (close(private_fifo))
-        printf("Erro 1:%s\n", strerror(errno));
+        printf("Erro 4:%s\n", strerror(errno));
 
     //queue thread
 
     pthread_mutex_lock(&add_queue);
-    queue[arr_size++] = pthread_self();
-    if (arr_size >= max)
-    {
-        queue = realloc(queue, max * 10 * sizeof(pthread_t));
-        max *= 10;
-        //printf("queue resized: %i %lu\n", max, sizeof(pthread_t));
-    }
+	arr_size--;
+	if(arr_size<1000)
+		pthread_cond_signal(&cvar);
     pthread_mutex_unlock(&add_queue);
     //printf("out - (U.c) % i\n\n", tmp.i);
 
-
+	pthread_mutex_lock(&t_queue);
+		threads--;
+		if(threads<2000)
+			pthread_cond_signal(&tvar);
+	pthread_mutex_unlock(&t_queue);
     pthread_exit(NULL);
 }

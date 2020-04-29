@@ -41,6 +41,12 @@ void delay(int number_of_seconds)
 
 pthread_mutex_t place_mod = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t access_input = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t add_queue = PTHREAD_MUTEX_INITIALIZER;
+
+pthread_cond_t cvar = PTHREAD_COND_INITIALIZER;
+
+pthread_mutex_t t_queue = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t tvar = PTHREAD_COND_INITIALIZER;
 
 struct timeval *startTime;
 args arguments;
@@ -48,7 +54,8 @@ pthread_t *queue;
 int max = 100;
 int maxFreeSpots = MAX_THREAD;
 pthread_t *spots;
-
+long int arr_size=0;
+int threads=0;
 int msleep(long tms)
 {
     struct timespec ts;
@@ -132,6 +139,11 @@ void *processRequest(void *input){
     sprintf(tmp_,"/tmp/%s",fifoLoad);
     sprintf(fifoLoad,"%s",tmp_);
     int tmp;
+    pthread_mutex_lock(&add_queue);
+	arr_size++;
+	if(arr_size>= 1000)
+		pthread_cond_wait(&cvar, &add_queue);
+    pthread_mutex_unlock(&add_queue);
     if((tmp = open(fifoLoad, O_WRONLY ))==-1){
         fprintf(stderr,"erro 1\n");
         fflush(stderr);
@@ -151,12 +163,25 @@ void *processRequest(void *input){
     }
     printf("OK -% i %i %i %f %i\n",  local.i, local.pid, local.tid, local.dur, local.pl);
     //printf("Done %i\n\n",local.i);
-    fflush(stdout);
-
-    if(local.pl!=-1)
-        msleep(local.dur);
+    fflush(stdout);    
 
     close(tmp);
+
+    pthread_mutex_lock(&add_queue);
+	arr_size--;
+	if(arr_size<1000)
+		pthread_cond_signal(&cvar);
+    pthread_mutex_unlock(&add_queue);
+
+    if(local.pl!=-1){
+        msleep(local.dur);
+    }
+
+    	pthread_mutex_lock(&t_queue);
+		threads--;
+		if(threads<2000)
+			pthread_cond_signal(&tvar);
+	pthread_mutex_unlock(&t_queue);
     pthread_exit(NULL);
 }
 
@@ -189,7 +214,7 @@ int main(int argc, char **argv)
         //pthread_mutex_unlock(&access_input);
         //msleep(1);
     }
-    //printf("Closed\n");
+    printf("Closed\n");
     
     //while (((ti = timeSinceStartTime()) / 1000))
     //{
@@ -205,6 +230,11 @@ int main(int argc, char **argv)
         fflush(stdout);
         pthread_t t;
         input.pl=0;
+	pthread_mutex_lock(&t_queue);
+		threads++;
+		if(threads>2000)
+			pthread_cond_wait(&tvar, &t_queue);
+	pthread_mutex_unlock(&t_queue);
         while (pthread_create(&t,NULL,processRequest,&input)) {}
     }
     //pthread_mutex_unlock(&access_input);
