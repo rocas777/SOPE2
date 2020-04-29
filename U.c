@@ -108,7 +108,7 @@ int main(int argc, char **argv)
 {
     init(argc, argv);
 
-    fifo = open(arguments.fifoname, O_WRONLY);
+    fifo = open(arguments.fifoname, O_WRONLY );
     //abre a fifo pública
 
     //printf("FIFO at '%s' created and opened with success!\n", arguments.fifoname);
@@ -120,7 +120,7 @@ int main(int argc, char **argv)
     int threads = 0;
     while ((t = timeSinceStartTime()) / 1000 < arguments.secs && out)
     {
-        msleep(5);
+        msleep(1);
         pthread_t t;
         int err;
         if ((err = pthread_create(&t, NULL, utilizador, NULL)))
@@ -128,7 +128,7 @@ int main(int argc, char **argv)
         threads++; //free threads
 
         //limitar o num de threads por causa dos ficheiros abertos
-        if (threads > MAX_THREAD)
+        if (threads > 10)
         {
             pthread_mutex_lock(&add_queue);
             while (arr_size)
@@ -159,7 +159,7 @@ int main(int argc, char **argv)
     close(fifo);
     free(startTime);
     free(queue);
-    return 0;
+    exit(0);
 }
 
 void *utilizador()
@@ -193,35 +193,11 @@ void *utilizador()
         exit(errno);
     }
 
-    //bloqueia o acesso ao fifo, apenas um thread de cada vez pode escrever
-    //msleep(5000);
-    
-    //printf("Fifo Done - (U.c) % i\n", i);
-    /*if(!file_exists(arguments.fifoname)){
-                out=0;
-                printf("Não existe\n");
-                return NULL;
-        }*/
-    /*if(fifo==-1){
-        //printf("erro 1 %i\n",tmp.i);
-        out=0;
-        pthread_mutex_lock(&add_queue);
-        queue[arr_size++] = pthread_self();
-        if (arr_size >= max)
-        {
-            queue = realloc(queue, max * 10 * sizeof(pthread_t));
-            max *= 10;
-            //printf("queue resized: %i %lu\n", max, sizeof(pthread_t));
-        }
-        pthread_mutex_unlock(&add_queue);
-        return NULL;
-    }*/
-
-
-    pthread_mutex_lock(&write_fifo);
+    //pthread_mutex_lock(&write_fifo);
     //printf("Be -% i %i %i %f %i\n", tmp.i, tmp.pid, tmp.tid, tmp.dur, tmp.pl);
-    if(write(fifo, &tmp, sizeof(request))==-1 || !file_exists(arguments.fifoname)){
+    if(!file_exists(arguments.fifoname) || write(fifo, &tmp, sizeof(request))==-1  ){
         //printf("erro 2 %i\n",tmp.i);
+        pthread_mutex_lock(&add_queue);
         printf("ERRO\n");
         fflush(stdout);
         out=0;
@@ -233,11 +209,12 @@ void *utilizador()
             //printf("queue resized: %i %lu\n", max, sizeof(pthread_t));
         }
         pthread_mutex_unlock(&add_queue);
-        return NULL;
+        pthread_exit(NULL);
     }
+    //printf("Wrote\n");
     fflush(stdout);
 
-    pthread_mutex_unlock(&write_fifo);
+    //pthread_mutex_unlock(&write_fifo);
     //printf("Escreveu\n");
 
     //abre o fifo privado
@@ -273,5 +250,5 @@ void *utilizador()
     //printf("out - (U.c) % i\n\n", tmp.i);
 
 
-    return NULL;
+    pthread_exit(NULL);
 }

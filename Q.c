@@ -40,6 +40,7 @@ void delay(int number_of_seconds)
 }
 
 pthread_mutex_t place_mod = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t access_input = PTHREAD_MUTEX_INITIALIZER;
 
 struct timeval *startTime;
 args arguments;
@@ -118,17 +119,24 @@ long int place=0;
 void *processRequest(void *input){
 
     //msleep(10);
-    request local=*(request*)input;
-    //printf("Bef - (Q.c) % i %i %i %f %i\n", local.i, local.pid, local.tid, local.dur, local.pl);
+    //pthread_mutex_lock(&access_input);
+    request local;
+    memcpy ( &local, input, sizeof (request) );
+    free(input);
+    //pthread_mutex_unlock(&access_input);
+    //printf("Be -% i %i %i %f %i\n", local.i, local.pid, local.tid, local.dur, local.pl);
+    fflush(stdout);
     char fifoLoad[599];
     char tmp_[599];
     sprintf(fifoLoad, "%i.%i", local.pid, local.tid);
     sprintf(tmp_,"/tmp/%s",fifoLoad);
     sprintf(fifoLoad,"%s",tmp_);
     int tmp;
-    if((tmp = open(fifoLoad, O_WRONLY))==-1)
-        perror("erro\n");
-    fflush(stderr);
+    if((tmp = open(fifoLoad, O_WRONLY ))==-1){
+        fprintf(stderr,"erro 1\n");
+        fflush(stderr);
+        //msleep(10);
+    }
     pthread_mutex_lock(&place_mod);
     if(local.pl)
         local.pl=++place;
@@ -136,7 +144,11 @@ void *processRequest(void *input){
         local.pl=-1;
     }
     pthread_mutex_unlock(&place_mod);
-    while(!write(tmp,&local,sizeof(request))){}
+    if(write(tmp,&local,sizeof(request))==-1){
+        fprintf(stderr,"ERRO 2\n");
+        fflush(stderr);
+        pthread_exit(NULL);
+    }
     printf("OK -% i %i %i %f %i\n",  local.i, local.pid, local.tid, local.dur, local.pl);
     //printf("Done %i\n\n",local.i);
     fflush(stdout);
@@ -145,7 +157,7 @@ void *processRequest(void *input){
         msleep(local.dur);
 
     close(tmp);
-    return NULL;
+    pthread_exit(NULL);
 }
 
 int i = 0;
@@ -154,21 +166,28 @@ int fifo;
 int main(int argc, char **argv)
 {
     init(argc, argv);
-    request input;
     //printf("Tentou\n");
     fifo = open(arguments.fifoname, O_RDONLY); //abre a fifo pública
     //printf("Opened\n");
     double ti;
+    request input;
     //request u = {0,0,0,0,0};
     while (((ti = timeSinceStartTime()) / 1000) < arguments.secs)
     {
+
+        //pthread_mutex_lock(&access_input);
         if (read(fifo, &input, sizeof(input)))
         {
             //printf("Read %i\n",input.i);
             fflush(stdout);
+	    request *tmp_r=malloc(sizeof(request));
+    	    memcpy ( tmp_r, &input, sizeof (request) );
             pthread_t t;
-            pthread_create(&t,NULL,processRequest,&input);
+            while (pthread_create(&t,NULL,processRequest,tmp_r)) {}
+
         }
+        //pthread_mutex_unlock(&access_input);
+        //msleep(1);
     }
     //printf("Closed\n");
     
@@ -178,14 +197,17 @@ int main(int argc, char **argv)
     if (unlink(arguments.fifoname))
         printf("Erro 2 (com '%i'): %s\n", fifo, strerror(errno));
     msleep(10);
+
+    //pthread_mutex_lock(&access_input);
     while((u=read(fifo, &input, sizeof(input))))
     {
         //printf("Read %i\n",input.i);
         fflush(stdout);
         pthread_t t;
         input.pl=0;
-        pthread_create(&t,NULL,processRequest,&input);
+        while (pthread_create(&t,NULL,processRequest,&input)) {}
     }
+    //pthread_mutex_unlock(&access_input);
     //printf("%i\n\n",u);
     //}
     
@@ -193,6 +215,6 @@ int main(int argc, char **argv)
     free(startTime);
     free(queue);
     close(fifo);
-    return 0;
+    exit(0);
 }
 
