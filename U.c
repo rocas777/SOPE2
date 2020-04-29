@@ -56,8 +56,8 @@ int msleep(long tms)
         return -1;
     }
 
-    ts.tv_sec = tms / 1000000;
-    ts.tv_nsec = (tms % 1000000) * 1000000000;
+    ts.tv_sec = tms / 1000;
+    ts.tv_nsec = (tms % 1000) * 1000000;
 
     do
     {
@@ -78,7 +78,7 @@ double timeSinceStartTime()
 void printRequest(request *req)
 {
     printf("%f ; %i ; %i ; %i ; %f ; %i ; ", timeSinceStartTime(), req->i, req->pid, req->tid, req->dur, req->pl);
-    fflush(stdout);
+    //fflush(stdout);
 }
 
 void printIWANT(request *req)
@@ -146,6 +146,9 @@ int fifo;
 int out = 1;
 
 int threads = 0;
+
+int gid=0;
+
 int main(int argc, char **argv)
 {
     init(argc, argv);
@@ -161,7 +164,7 @@ int main(int argc, char **argv)
     double t = 0;
     while ((t = timeSinceStartTime()) / 1000 < arguments.secs && out)
     {
-        msleep(100);
+        msleep(1);
 	pthread_t t;
         int err;
 	pthread_mutex_lock(&t_queue);
@@ -172,7 +175,7 @@ int main(int argc, char **argv)
 
         while ((err = pthread_create(&t, NULL, utilizador, NULL))){
             printf("Erro 1: %i\n", threads);
-	    msleep(1000);	
+	    msleep(1);	
 	}
 	if(i>u)
 		u=i;
@@ -190,6 +193,11 @@ int main(int argc, char **argv)
     close(fifo);
     free(startTime);
     free(queue);
+
+    //char tt[1000];
+    //sprintf(tt,"rm /tmp/*%i*",getpid());
+    //printf("%s\n",tt);
+    //system(tt);
     exit(0);
 }
 
