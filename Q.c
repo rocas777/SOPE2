@@ -104,7 +104,7 @@ void init(int argc, char **argv)
     gettimeofday(startTime, 0);
     load_args(argc, argv);
     queue = malloc(sizeof(pthread_t) * max);
-    spots = malloc(sizeof(pthread_t) * maxFreeSpots + 1);
+    spots = malloc(sizeof(pthread_t) * maxFreeSpots);
 
     if (mkfifo(arguments.fifoname, 0600) < 0)
     {
@@ -143,11 +143,12 @@ int main(int argc, char **argv)
                     pthread_join(spots[spot], NULL);
                 }
             }
+            printf("time -> %f", ((input.dur + ti) / 1000) - arguments.secs);
             printf("OK - (Q.c) % i %i %i %f %i\n", input.i, input.pid, input.tid, input.dur, input.pl);
             pthread_create(&t, NULL, processRequest, NULL);
             i++;
-            usleep(1);
         }
+        // msleep(1);
     }
 
     while (read(fifo, &input, sizeof(input)))
@@ -167,7 +168,7 @@ void *processRequest()
     sprintf(fifoLoad, "%d.%d", input.pid, input.tid);
     tmp = fopen(fifoLoad, "w");
 
-    if (input.pl == -1)
+    if (input.pl != -1)
     {
         msleep(input.dur);
     }
