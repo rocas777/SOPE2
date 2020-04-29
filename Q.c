@@ -237,7 +237,7 @@ void *processRequest(void *input)
 
     	pthread_mutex_lock(&t_queue);
 		threads--;
-		if(threads<2000)
+		if(threads<5000)
 			pthread_cond_signal(&tvar);
 	pthread_mutex_unlock(&t_queue);
     pthread_exit(NULL);
@@ -250,7 +250,7 @@ int main(int argc, char **argv)
 {
     init(argc, argv);
     //printf("Tentou\n");
-    fifo = open(arguments.fifoname, O_RDONLY); //abre a fifo pública
+    fifo = open(arguments.fifoname, O_RDONLY | O_NONBLOCK); //abre a fifo pública
     //printf("Opened\n");
     double ti;
     request input;
@@ -259,7 +259,7 @@ int main(int argc, char **argv)
     {
 
         //pthread_mutex_lock(&access_input);
-        if (read(fifo, &input, sizeof(input)))
+        if (read(fifo, &input, sizeof(input))>0)
         {
             //printf("Read %i\n",input.i);
             fflush(stdout);
@@ -268,6 +268,11 @@ int main(int argc, char **argv)
             request *tmp_r = malloc(sizeof(request));
             memcpy(tmp_r, &input, sizeof(request));
             pthread_t t;
+	    pthread_mutex_lock(&t_queue);
+		threads++;
+		if(threads>5000)
+			pthread_cond_wait(&tvar, &t_queue);
+	    pthread_mutex_unlock(&t_queue);
             while (pthread_create(&t, NULL, processRequest, tmp_r))
             {
             }
@@ -281,7 +286,7 @@ int main(int argc, char **argv)
     int u;
     if (unlink(arguments.fifoname))
         printf("Erro 2 (com '%i'): %s\n", fifo, strerror(errno));
-    msleep(10);
+    msleep(50);
 
     //pthread_mutex_lock(&access_input);
     while ((u = read(fifo, &input, sizeof(input))))
@@ -295,7 +300,7 @@ int main(int argc, char **argv)
         input.pl=0;
 	pthread_mutex_lock(&t_queue);
 		threads++;
-		if(threads>2000)
+		if(threads>5000)
 			pthread_cond_wait(&tvar, &t_queue);
 	pthread_mutex_unlock(&t_queue);
         while (pthread_create(&t,NULL,processRequest,&input)) {}

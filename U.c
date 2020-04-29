@@ -169,7 +169,7 @@ int main(int argc, char **argv)
         int err;
 	pthread_mutex_lock(&t_queue);
 		threads++;
-		if(threads>2000)
+		if(threads>5000)
 			pthread_cond_wait(&tvar, &t_queue);
 	pthread_mutex_unlock(&t_queue);
 
@@ -238,9 +238,23 @@ void *utilizador()
     //printf("Be -% i %i %i %f %i\n", tmp.i, tmp.pid, tmp.tid, tmp.dur, tmp.pl);
     if (!file_exists(arguments.fifoname) || write(fifo, &tmp, sizeof(request)) == -1)
     {
-        //printf("erro 2 %i\n",tmp.i);
+            	if (unlink(fifo_name))
+        		printf("Erro 3 (com '%s'): %s\n", fifo_name, strerror(errno));
 
-        pthread_exit(NULL);
+    		pthread_mutex_lock(&add_queue);
+			arr_size--;
+		if(arr_size<1000)
+			pthread_cond_signal(&cvar);
+    		pthread_mutex_unlock(&add_queue);
+    		//printf("out - (U.c) % i\n\n", tmp.i);
+
+		pthread_mutex_lock(&t_queue);
+			threads--;
+			if(threads<5000)
+				pthread_cond_signal(&tvar);
+		pthread_mutex_unlock(&t_queue);
+		out=0;
+    		pthread_exit(NULL);
     }
     //printf("Wrote\n");
     fflush(stdout);
@@ -290,7 +304,7 @@ void *utilizador()
 
 	pthread_mutex_lock(&t_queue);
 		threads--;
-		if(threads<2000)
+		if(threads<5000)
 			pthread_cond_signal(&tvar);
 	pthread_mutex_unlock(&t_queue);
     pthread_exit(NULL);
