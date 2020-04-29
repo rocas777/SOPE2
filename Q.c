@@ -115,7 +115,6 @@ void init(int argc, char **argv)
 }
 
 void *processRequest();
-int waitFreeSpot();
 int i = 0;
 int fifo;
 request input;
@@ -135,21 +134,20 @@ int main(int argc, char **argv)
         {
             if (((input.dur + ti) / 1000) < arguments.secs)
             {
-                if (i < maxFreeSpots)
+                input.pl = i;
+                spots[i] = t;
+                if (!(i < maxFreeSpots))
                 {
-                    input.pl = i;
-                    spots[i] = t;
-                }
-                else
-                {
-                    int spot = waitFreeSpot();
-                    input.pl = spot;
-                    spots[spot] = t;
+                    pthread_join(spots[i], NULL);
                 }
             }
             printf("OK - (Q.c) % i %i %i %f %i\n", input.i, input.pid, input.tid, input.dur, input.pl);
             pthread_create(&t, NULL, processRequest, NULL);
             i++;
+            if (i > maxFreeSpots)
+            {
+                i %= maxFreeSpots;
+            }
         }
     }
 
@@ -180,7 +178,7 @@ void *processRequest()
     // printf("OK - (Q.c) % i %i %i %f %i 1---%f\n", input.i, input.pid, input.tid, input.dur, input.pl, timeSinceStartTime());
     // fflush(stdout);
 
-    fwrite(&input, 1, sizeof(request), tmp);
+    fwrite(&input, 1, sizeof(request) + 1, tmp);
 
     // fflush(stdout);
     // printf("OK - (Q.c) % i %i %i %f %i 2---%f\n", input.i, input.pid, input.tid, input.dur, input.pl, timeSinceStartTime());
@@ -194,12 +192,5 @@ void *processRequest()
 
     fclose(tmp);
 
-    return (void *)&input.pl;
-}
-
-int waitFreeSpot()
-{
-    void *freeSpot;
-    pthread_join(spots[i % maxFreeSpots - 1], &freeSpot);
-    return *(int *)freeSpot;
+    return NULL;
 }
