@@ -79,6 +79,47 @@ double timeSinceStartTime()
     return (double)(instant.tv_sec - startTime->tv_sec) * 1000.0f + (instant.tv_usec - startTime->tv_usec) / 1000.0f;
 }
 
+void printRequest(request *req)
+{
+    printf("%f ; %i ; %i ; %i ; %f ; %i ; ", timeSinceStartTime(), req->i, req->pid, req->tid, req->dur, req->pl);
+    // fflush(stdout);
+}
+
+void printRECVD(request *req)
+{
+    printRequest(req);
+    printf("RECVD\n");
+    fflush(stdout);
+}
+
+void printENTER(request *req)
+{
+    printRequest(req);
+    printf("ENTER\n");
+    fflush(stdout);
+}
+
+void printTIMUP(request *req)
+{
+    printRequest(req);
+    printf("TIMUP\n");
+    fflush(stdout);
+}
+
+void print2LATE(request *req)
+{
+    printRequest(req);
+    printf("2LATE\n");
+    fflush(stdout);
+}
+
+void printGAVUP(request *req)
+{
+    printRequest(req);
+    printf("GAVUP\n");
+    fflush(stdout);
+}
+
 void load_args(int argc, char **argv)
 {
     for (int i = 1; i < argc; i++)
@@ -114,14 +155,15 @@ void init(int argc, char **argv)
     }
 }
 
-long int place=0;
+long int place = 0;
 
-void *processRequest(void *input){
+void *processRequest(void *input)
+{
 
     //msleep(10);
     //pthread_mutex_lock(&access_input);
     request local;
-    memcpy ( &local, input, sizeof (request) );
+    memcpy(&local, input, sizeof(request));
     free(input);
     //pthread_mutex_unlock(&access_input);
     //printf("Be -% i %i %i %f %i\n", local.i, local.pid, local.tid, local.dur, local.pl);
@@ -129,32 +171,56 @@ void *processRequest(void *input){
     char fifoLoad[599];
     char tmp_[599];
     sprintf(fifoLoad, "%i.%i", local.pid, local.tid);
-    sprintf(tmp_,"/tmp/%s",fifoLoad);
-    sprintf(fifoLoad,"%s",tmp_);
+    sprintf(tmp_, "/tmp/%s", fifoLoad);
+    sprintf(fifoLoad, "%s", tmp_);
     int tmp;
-    if((tmp = open(fifoLoad, O_WRONLY ))==-1){
-        fprintf(stderr,"erro 1\n");
+    if ((tmp = open(fifoLoad, O_WRONLY)) == -1)
+    {
+        fprintf(stderr, "erro 1\n");
         fflush(stderr);
         //msleep(10);
     }
     pthread_mutex_lock(&place_mod);
-    if(local.pl)
-        local.pl=++place;
-    else {
-        local.pl=-1;
+
+    if (local.pl && ((local.dur + timeSinceStartTime()) / 1000) < arguments.secs)
+    {
+        local.pl = ++place;
+    }
+    else
+    {
+        local.pl = -1;
     }
     pthread_mutex_unlock(&place_mod);
-    if(write(tmp,&local,sizeof(request))==-1){
-        fprintf(stderr,"ERRO 2\n");
+    if (write(tmp, &local, sizeof(request)) == -1)
+    {
+        printGAVUP(&local);
+        fprintf(stderr, "ERRO 2\n");
         fflush(stderr);
         pthread_exit(NULL);
     }
-    printf("OK -% i %i %i %f %i\n",  local.i, local.pid, local.tid, local.dur, local.pl);
-    //printf("Done %i\n\n",local.i);
-    fflush(stdout);
 
-    if(local.pl!=-1)
+    // printf("OK -% i %i %i %f %i\n",  local.i, local.pid, local.tid, local.dur, local.pl);
+    // //printf("Done %i\n\n",local.i);
+    // fflush(stdout);
+
+    // printf("OK - (Q.c) % i %i %i %f %i 1---%f\n", local.i, local.pid, local.tid, local.dur, local.pl, timeSinceStartTime());
+    // fflush(stdout);
+
+    if (local.pl != -1)
+    {
+        printENTER(&local);
+        fflush(stdout);
         msleep(local.dur);
+        printTIMUP(&local);
+        fflush(stdout);
+    }
+    else
+    {
+        print2LATE(&local);
+    }
+
+    // printf("OK - (Q.c) % i %i %i %f %i 2---%f\n", local.i, local.pid, local.tid, local.dur, local.pl, timeSinceStartTime());
+    // fflush(stdout);
 
     close(tmp);
     pthread_exit(NULL);
@@ -180,17 +246,20 @@ int main(int argc, char **argv)
         {
             //printf("Read %i\n",input.i);
             fflush(stdout);
-	    request *tmp_r=malloc(sizeof(request));
-    	    memcpy ( tmp_r, &input, sizeof (request) );
-            pthread_t t;
-            while (pthread_create(&t,NULL,processRequest,tmp_r)) {}
+            printRECVD(&input);
 
+            request *tmp_r = malloc(sizeof(request));
+            memcpy(tmp_r, &input, sizeof(request));
+            pthread_t t;
+            while (pthread_create(&t, NULL, processRequest, tmp_r))
+            {
+            }
         }
         //pthread_mutex_unlock(&access_input);
         //msleep(1);
     }
     //printf("Closed\n");
-    
+
     //while (((ti = timeSinceStartTime()) / 1000))
     //{
     int u;
@@ -199,22 +268,24 @@ int main(int argc, char **argv)
     msleep(10);
 
     //pthread_mutex_lock(&access_input);
-    while((u=read(fifo, &input, sizeof(input))))
+    while ((u = read(fifo, &input, sizeof(input))))
     {
         //printf("Read %i\n",input.i);
         fflush(stdout);
+        printRECVD(&input);
+
         pthread_t t;
-        input.pl=0;
-        while (pthread_create(&t,NULL,processRequest,&input)) {}
+        input.pl = 0;
+        while (pthread_create(&t, NULL, processRequest, &input))
+        {
+        }
     }
     //pthread_mutex_unlock(&access_input);
     //printf("%i\n\n",u);
     //}
-    
 
     free(startTime);
     free(queue);
     close(fifo);
     exit(0);
 }
-
