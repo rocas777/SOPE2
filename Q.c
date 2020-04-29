@@ -104,7 +104,7 @@ void init(int argc, char **argv)
     gettimeofday(startTime, 0);
     load_args(argc, argv);
     queue = malloc(sizeof(pthread_t) * max);
-    spots = malloc(sizeof(pthread_t) * maxFreeSpots);
+    spots = malloc(sizeof(pthread_t) * maxFreeSpots + 1);
 
     if (mkfifo(arguments.fifoname, 0600) < 0)
     {
@@ -115,7 +115,6 @@ void init(int argc, char **argv)
 }
 
 void *processRequest();
-int findFreeSpot();
 int waitFreeSpot();
 int i = 0;
 int fifo;
@@ -139,22 +138,17 @@ int main(int argc, char **argv)
                 if (i < maxFreeSpots)
                 {
                     input.pl = i;
-                    pthread_create(&t, NULL, processRequest, NULL);
                     spots[i] = t;
                 }
                 else
                 {
-                    // printf("OK - (Q.c) % i %i %i %f %i\n", input.i, input.pid, input.tid, input.dur, input.pl);
                     int spot = waitFreeSpot();
                     input.pl = spot;
-                    pthread_create(&t, NULL, processRequest, NULL);
                     spots[spot] = t;
                 }
             }
-            else
-            {
-                pthread_create(&t, NULL, processRequest, NULL);
-            }
+            printf("OK - (Q.c) % i %i %i %f %i\n", input.i, input.pid, input.tid, input.dur, input.pl);
+            pthread_create(&t, NULL, processRequest, NULL);
             i++;
         }
     }
@@ -176,15 +170,21 @@ void *processRequest()
     sprintf(fifoLoad, "%d.%d", input.pid, input.tid);
     tmp = fopen(fifoLoad, "w");
 
-    fflush(stdout);
+    if (input.pl == -1)
+    {
+        msleep(input.dur);
+    }
+
+    // fflush(stdout);
     // printf("OK - (Q.c) % i %i %i %f %i\n", input.i, input.pid, input.tid, input.dur, input.pl);
-    printf("OK - (Q.c) % i %i %i %f %i 1---%f\n", input.i, input.pid, input.tid, input.dur, input.pl, timeSinceStartTime());
+    // printf("OK - (Q.c) % i %i %i %f %i 1---%f\n", input.i, input.pid, input.tid, input.dur, input.pl, timeSinceStartTime());
+    // fflush(stdout);
 
     fwrite(&input, 1, sizeof(request), tmp);
-    msleep(input.dur);
 
-    fflush(stdout);
-    printf("OK - (Q.c) % i %i %i %f %i 2---%f\n", input.i, input.pid, input.tid, input.dur, input.pl, timeSinceStartTime());
+    // fflush(stdout);
+    // printf("OK - (Q.c) % i %i %i %f %i 2---%f\n", input.i, input.pid, input.tid, input.dur, input.pl, timeSinceStartTime());
+    // fflush(stdout);
 
     // write(fifo, &input, sizeof(request));
 
@@ -200,6 +200,6 @@ void *processRequest()
 int waitFreeSpot()
 {
     void *freeSpot;
-    pthread_join(spots[25], &freeSpot);
+    pthread_join(spots[i % maxFreeSpots - 1], &freeSpot);
     return *(int *)freeSpot;
 }
