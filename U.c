@@ -142,7 +142,7 @@ int main(int argc, char **argv)
     //printf("Thread creation Ended\n");
 
     //free threads
-    msleep(10);
+    //msleep(10);
     while (arr_size)
     {
         pthread_mutex_lock(&add_queue);
