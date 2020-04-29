@@ -12,16 +12,24 @@
 #include "types.h"
 #include <sys/syscall.h>
 
-#define MAX_THREAD 1020
+#include <sys/stat.h>   // stat
+#include <stdbool.h>    // bool type
 
-struct{
+struct
+{
     long unsigned secs;
     char *fifoname;
-}typedef args ;
+} typedef args;
 
 //por alguma razão o gettid não estava definido
-pid_t gettid(){
+pid_t gettid()
+{
     return syscall(SYS_gettid);
+}
+
+bool file_exists (char *filename) {
+    struct stat   buffer;
+    return (stat (filename, &buffer) == 0);
 }
 
 pthread_mutex_t add_i = PTHREAD_MUTEX_INITIALIZER;
@@ -44,7 +52,8 @@ int msleep(long tms)
     ts.tv_sec = tms / 1000;
     ts.tv_nsec = (tms % 1000) * 1000000;
 
-    do {
+    do
+    {
         ret = nanosleep(&ts, &ts);
     } while (ret && errno == EINTR);
 
@@ -56,156 +65,213 @@ double timeSinceStartTime()
     struct timeval instant;
     gettimeofday(&instant, 0);
 
-    return (double) (instant.tv_sec - startTime->tv_sec) * 1000.0f + (instant.tv_usec - startTime->tv_usec) / 1000.0f;
+    return (double)(instant.tv_sec - startTime->tv_sec) * 1000.0f + (instant.tv_usec - startTime->tv_usec) / 1000.0f;
 }
 
-void load_args(int argc, char **argv){
-    for(int i=1;i<argc;i++){
+void load_args(int argc, char **argv)
+{
+    for (int i = 1; i < argc; i++)
+    {
         argv++;
         //se for o argumento tempo
-        if(strncmp(*argv,"-t",2)==0){
+        if (strncmp(*argv, "-t", 2) == 0)
+        {
             i++;
             argv++;
             arguments.secs = atoi(*argv);
         }
-        else { // se for o argumento fifoname
-            arguments.fifoname=*argv;
+        else
+        { // se for o argumento fifoname
+            arguments.fifoname = *argv;
         }
     }
 }
 
 pthread_t *queue;
-int max=100;
-void init(int argc, char **argv){
-    startTime=malloc(sizeof(struct timeval));
-    gettimeofday(startTime,0);
-    load_args(argc,argv);
-    queue=malloc(sizeof(pthread_t)*max);
+int max = 100;
+void init(int argc, char **argv)
+{
+    startTime = malloc(sizeof(struct timeval));
+    gettimeofday(startTime, 0);
+    load_args(argc, argv);
+    queue = malloc(sizeof(pthread_t) * max);
 }
-int arr_size=0;
+int arr_size = 0;
 
 void *utilizador();
-int i=0;
-int fifo;;
+int i = 0;
+int fifo;
 
-int main(int argc, char **argv){
-    init(argc,argv);
+int out=1;
 
- 
-    fifo = open(arguments.fifoname,O_WRONLY); //abre a fifo pública
+int main(int argc, char **argv)
+{
+    init(argc, argv);
 
-    
-    printf("FIFO at '%s' created and opened with success!\n", arguments.fifoname);
+    fifo = open(arguments.fifoname, O_WRONLY);
+    //abre a fifo pública
+
+    //printf("FIFO at '%s' created and opened with success!\n", arguments.fifoname);
 
     //loop principal
-    printf("Started\n");
+    //printf("Started\n");
     fflush(stdout);
-    double t=0;
-    int threads=0;
-    while ((t=timeSinceStartTime())/1000<arguments.secs) {
-        msleep(1);
+    double t = 0;
+    int threads = 0;
+    while ((t = timeSinceStartTime()) / 1000 < arguments.secs && out)
+    {
+        msleep(5);
         pthread_t t;
         int err;
-        if((err=pthread_create(&t,NULL,utilizador,NULL)))
-            printf("%i\n",err);
-        threads++;    //free threads
+        if ((err = pthread_create(&t, NULL, utilizador, NULL)))
+            printf("%i\n", err);
+        threads++; //free threads
 
         //limitar o num de threads por causa dos ficheiros abertos
-        if(threads>MAX_THREAD){
+        if (threads > MAX_THREAD)
+        {
             pthread_mutex_lock(&add_queue);
-            while(arr_size){
-                while(arr_size){
-                    pthread_join(queue[--arr_size],NULL);
-                    threads--;
-                    }
+            while (arr_size)
+            {
+                pthread_join(queue[--arr_size], NULL);
+                threads--;
             }
             pthread_mutex_unlock(&add_queue);
         }
     }
-    printf("Thread creation Ended\n");
+    //printf("Thread creation Ended\n");
 
     //free threads
-    pthread_mutex_lock(&add_queue);
-    while(arr_size){
-            pthread_join(queue[--arr_size],NULL);
+    msleep(10);
+    while (arr_size)
+    {
+        pthread_mutex_lock(&add_queue);
+        if(arr_size){
+            pthread_join(queue[--arr_size], NULL);
+            threads--;
+        }
+        pthread_mutex_unlock(&add_queue);
     }
-    pthread_mutex_unlock(&add_queue);
+    printf("%i\n",threads);
 
-    printf("Program Ended\n");
+    //printf("Program Ended\n");
+
     close(fifo);
     free(startTime);
     free(queue);
-    if((unlink(arguments.fifoname))){
-        printf("%s\n",strerror(errno));
-    }   
     return 0;
 }
 
-void *utilizador(){
-    pthread_mutex_lock(&add_queue);
-        queue[arr_size++]=pthread_self();
-        if(arr_size>=max){
-            queue=realloc(queue,max*10*sizeof(pthread_t));
-            max*=10;    
-            printf("queue resized: %i %lu\n",max,sizeof(pthread_t));
-        }
-    pthread_mutex_unlock(&add_queue);
-
+void *utilizador()
+{
     //int u=0;
     //gera tempo aleatório
-    unsigned seed=time(NULL)+i;
-    int dur=rand_r(&seed)%49+1;
+    unsigned seed = time(NULL) + i;
+    int dur = rand_r(&seed) % 49 + 1;
 
     //incrementa o i, apenas um pode aceder de cada vez
     pthread_mutex_lock(&add_i);
-        i++;
+    i++;
+    //printf("in - (U.c) % i\n", i);
     pthread_mutex_unlock(&add_i);
 
-
     //cria a struct request que vai ser enviada para o fifo
-        request tmp={i,getpid(),gettid(),dur,-1};
-        printf("(printf on utilizador() at U.c) % i %i %i %f %i\n",tmp.i,tmp.pid,tmp.tid,tmp.dur,tmp.pl);
-
+    request tmp = {i, getpid(), gettid(), dur, -1};
 
     //cria o fifo privado
-    FILE *private_fifo;
-    char fifo_name[50];
-    sprintf(fifo_name,"%i.%i",getpid(),gettid());
-    if( mkfifo(fifo_name,0600) < 0){
+    int private_fifo;
+    char fifo_name[599];
+    char tmp_[599];
+    sprintf(fifo_name, "%i.%i", tmp.pid, tmp.tid);
+    sprintf(tmp_,"/tmp/%s",fifo_name);
+    sprintf(fifo_name,"%s",tmp_);
+    //printf("MkFifo - (U.c) % i\n", i);
+    if (mkfifo(fifo_name, 0600) < 0)
+    {
         //Cria a fifo privada e analiza se é válida.
         perror("ERROR setting up private FIFO on utilizador() of U.c ");
-        exit(errno); 
-    } 
+        exit(errno);
+    }
 
     //bloqueia o acesso ao fifo, apenas um thread de cada vez pode escrever
+    //msleep(5000);
+    
+    //printf("Fifo Done - (U.c) % i\n", i);
+    /*if(!file_exists(arguments.fifoname)){
+                out=0;
+                printf("Não existe\n");
+                return NULL;
+        }*/
+    /*if(fifo==-1){
+        //printf("erro 1 %i\n",tmp.i);
+        out=0;
+        pthread_mutex_lock(&add_queue);
+        queue[arr_size++] = pthread_self();
+        if (arr_size >= max)
+        {
+            queue = realloc(queue, max * 10 * sizeof(pthread_t));
+            max *= 10;
+            //printf("queue resized: %i %lu\n", max, sizeof(pthread_t));
+        }
+        pthread_mutex_unlock(&add_queue);
+        return NULL;
+    }*/
+
+
     pthread_mutex_lock(&write_fifo);
-        write(fifo,&tmp,sizeof(request));
+    //printf("Be -% i %i %i %f %i\n", tmp.i, tmp.pid, tmp.tid, tmp.dur, tmp.pl);
+    if(write(fifo, &tmp, sizeof(request))==-1 || !file_exists(arguments.fifoname)){
+        //printf("erro 2 %i\n",tmp.i);
+        printf("ERRO\n");
+        fflush(stdout);
+        out=0;
+        queue[arr_size++] = pthread_self();
+        if (arr_size >= max)
+        {
+            queue = realloc(queue, max * 10 * sizeof(pthread_t));
+            max *= 10;
+            //printf("queue resized: %i %lu\n", max, sizeof(pthread_t));
+        }
+        pthread_mutex_unlock(&add_queue);
+        return NULL;
+    }
+    fflush(stdout);
+
     pthread_mutex_unlock(&write_fifo);
     //printf("Escreveu\n");
 
     //abre o fifo privado
-        private_fifo = fopen(fifo_name,"r");
-        if( private_fifo == NULL ){
-            perror("ERROR opening private_fifo ( at U.c in utilizador() ) ");
-            exit(errno); 
-        }
     //printf("Abriu\n");
 
     //lê do fifo_privado
-        fread(&tmp,sizeof(request),1,private_fifo);
-        printf("Passou\n");
-    
-    
-    if(fclose(private_fifo))
-        printf("Erro 1:%s\n",strerror(errno));	
-    sprintf(fifo_name,"%i.%i",getpid(),gettid());
-    if(unlink(fifo_name))
+    //msleep(10);
+    if((private_fifo = open(fifo_name, O_RDONLY))==-1)
+        perror("erro\n");
+    fflush(stdout);
+    read(private_fifo,&tmp, sizeof(request));
+    printf("OK -% i %i %i %f %i\n", tmp.i, tmp.pid, tmp.tid, tmp.dur, tmp.pl);
+    fflush(stdout);
+
+
+    if (unlink(fifo_name))
         printf("Erro 2 (com '%s'): %s\n", fifo_name, strerror(errno));
-    printf("\n\n");
-	
-    //queue thread	
+
+    if (close(private_fifo))
+        printf("Erro 1:%s\n", strerror(errno));
+
+    //queue thread
+
+    pthread_mutex_lock(&add_queue);
+    queue[arr_size++] = pthread_self();
+    if (arr_size >= max)
+    {
+        queue = realloc(queue, max * 10 * sizeof(pthread_t));
+        max *= 10;
+        //printf("queue resized: %i %lu\n", max, sizeof(pthread_t));
+    }
+    pthread_mutex_unlock(&add_queue);
+    //printf("out - (U.c) % i\n\n", tmp.i);
+
+
     return NULL;
 }
-
-
-
