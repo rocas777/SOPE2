@@ -217,7 +217,6 @@ void *utilizador()
 
     //cria a struct request que vai ser enviada para o fifo
     request tmp = {i, getpid(), gettid(), dur, -1};
-    printIWANT(&tmp);
 
     //cria o fifo privado
     int private_fifo;
@@ -256,6 +255,7 @@ void *utilizador()
 		out=0;
     		pthread_exit(NULL);
     }
+    printIWANT(&tmp);
     //printf("Wrote\n");
     fflush(stdout);
 
