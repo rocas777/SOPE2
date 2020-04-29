@@ -251,7 +251,7 @@ void *utilizador()
 		pthread_cond_wait(&cvar, &add_queue);
 	arr_size++;
     pthread_mutex_unlock(&add_queue);
-    if((private_fifo = open(fifo_name, O_RDONLY))==-1)
+    if((private_fifo = open(fifo_name, O_RDONLY))==-1){
         perror("erro\n");
         printFAILD(&tmp);
     }
