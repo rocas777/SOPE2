@@ -127,6 +127,7 @@ int main(int argc, char **argv)
     fifo = open(arguments.fifoname, O_RDONLY); //abre a fifo pública
     printf("Opened\n");
     double ti;
+    int spot;
 
     while (((ti = timeSinceStartTime()) / 1000) < arguments.secs)
     {
@@ -134,21 +135,18 @@ int main(int argc, char **argv)
         {
             if (((input.dur + ti) / 1000) < arguments.secs)
             {
-                input.pl = i;
-                spots[i] = t;
+                spot = i % maxFreeSpots;
+                input.pl = spot;
+                spots[spot] = t;
                 if (i >= maxFreeSpots)
                 {
-                    pthread_join(spots[i], NULL);
+                    pthread_join(spots[spot], NULL);
                 }
             }
             printf("OK - (Q.c) % i %i %i %f %i\n", input.i, input.pid, input.tid, input.dur, input.pl);
             pthread_create(&t, NULL, processRequest, NULL);
             i++;
-            if (i >= maxFreeSpots)
-            {
-                i %= maxFreeSpots;
-            }
-            // usleep(1);
+            usleep(1);
         }
     }
 
