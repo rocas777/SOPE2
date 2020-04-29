@@ -148,6 +148,7 @@ int main(int argc, char **argv)
             {
                 i %= maxFreeSpots;
             }
+            usleep(1);
         }
     }
 
@@ -173,16 +174,16 @@ void *processRequest()
         msleep(input.dur);
     }
 
-    // fflush(stdout);
+    fflush(stdout);
     // printf("OK - (Q.c) % i %i %i %f %i\n", input.i, input.pid, input.tid, input.dur, input.pl);
-    // printf("OK - (Q.c) % i %i %i %f %i 1---%f\n", input.i, input.pid, input.tid, input.dur, input.pl, timeSinceStartTime());
-    // fflush(stdout);
+    printf("OK - (Q.c) % i %i %i %f %i 1---%f\n", input.i, input.pid, input.tid, input.dur, input.pl, timeSinceStartTime());
+    fflush(stdout);
 
     fwrite(&input, 1, sizeof(request) + 1, tmp);
 
-    // fflush(stdout);
-    // printf("OK - (Q.c) % i %i %i %f %i 2---%f\n", input.i, input.pid, input.tid, input.dur, input.pl, timeSinceStartTime());
-    // fflush(stdout);
+    fflush(stdout);
+    printf("OK - (Q.c) % i %i %i %f %i 2---%f\n", input.i, input.pid, input.tid, input.dur, input.pl, timeSinceStartTime());
+    fflush(stdout);
 
     // write(fifo, &input, sizeof(request));
 
