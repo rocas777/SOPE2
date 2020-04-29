@@ -12,8 +12,8 @@
 #include "types.h"
 #include <sys/syscall.h>
 
-#include <sys/stat.h>   // stat
-#include <stdbool.h>    // bool type
+#include <sys/stat.h> // stat
+#include <stdbool.h>  // bool type
 
 struct
 {
@@ -27,9 +27,10 @@ pid_t gettid()
     return syscall(SYS_gettid);
 }
 
-bool file_exists (char *filename) {
-    struct stat   buffer;
-    return (stat (filename, &buffer) == 0);
+bool file_exists(char *filename)
+{
+    struct stat buffer;
+    return (stat(filename, &buffer) == 0);
 }
 
 pthread_mutex_t add_i = PTHREAD_MUTEX_INITIALIZER;
@@ -74,6 +75,40 @@ double timeSinceStartTime()
     return (double)(instant.tv_sec - startTime->tv_sec) * 1000.0f + (instant.tv_usec - startTime->tv_usec) / 1000.0f;
 }
 
+void printRequest(request *req)
+{
+    printf("%f ; %i ; %i ; %i ; %f ; %i ; ", timeSinceStartTime(), req->i, req->pid, req->tid, req->dur, req->pl);
+    fflush(stdout);
+}
+
+void printIWANT(request *req)
+{
+    printRequest(req);
+    printf("IWANT\n");
+    fflush(stdout);
+}
+
+void printIAMIN(request *req)
+{
+    printRequest(req);
+    printf("IAMIN\n");
+    fflush(stdout);
+}
+
+void printCLOSD(request *req)
+{
+    printRequest(req);
+    printf("CLOSD\n");
+    fflush(stdout);
+}
+
+void printFAILD(request *req)
+{
+    printRequest(req);
+    printf("FAILD\n");
+    fflush(stdout);
+}
+
 void load_args(int argc, char **argv)
 {
     for (int i = 1; i < argc; i++)
@@ -108,14 +143,14 @@ void *utilizador();
 int i = 0;
 int fifo;
 
-int out=1;
+int out = 1;
 
 int threads = 0;
 int main(int argc, char **argv)
 {
     init(argc, argv);
 
-    fifo = open(arguments.fifoname, O_WRONLY );
+    fifo = open(arguments.fifoname, O_WRONLY);
     //abre a fifo pública
 
     //printf("FIFO at '%s' created and opened with success!\n", arguments.fifoname);
@@ -146,6 +181,7 @@ int main(int argc, char **argv)
     //printf("Thread creation Ended\n");
 
     //free threads
+
     msleep(10);
     printf("Erro 2: %i\n",threads);
 
@@ -173,14 +209,15 @@ void *utilizador()
 
     //cria a struct request que vai ser enviada para o fifo
     request tmp = {i, getpid(), gettid(), dur, -1};
+    printIWANT(&tmp);
 
     //cria o fifo privado
     int private_fifo;
     char fifo_name[599];
     char tmp_[599];
     sprintf(fifo_name, "%i.%i", tmp.pid, tmp.tid);
-    sprintf(tmp_,"/tmp/%s",fifo_name);
-    sprintf(fifo_name,"%s",tmp_);
+    sprintf(tmp_, "/tmp/%s", fifo_name);
+    sprintf(fifo_name, "%s", tmp_);
     //printf("MkFifo - (U.c) % i\n", i);
     if (mkfifo(fifo_name, 0600) < 0)
     {
@@ -191,8 +228,10 @@ void *utilizador()
 
     //pthread_mutex_lock(&write_fifo);
     //printf("Be -% i %i %i %f %i\n", tmp.i, tmp.pid, tmp.tid, tmp.dur, tmp.pl);
-    if(!file_exists(arguments.fifoname) || write(fifo, &tmp, sizeof(request))==-1  ){
+    if (!file_exists(arguments.fifoname) || write(fifo, &tmp, sizeof(request)) == -1)
+    {
         //printf("erro 2 %i\n",tmp.i);
+
         pthread_exit(NULL);
     }
     //printf("Wrote\n");
@@ -206,6 +245,7 @@ void *utilizador()
 
     //lê do fifo_privado
     //msleep(10);
+
     pthread_mutex_lock(&add_queue);
 	if(arr_size>= 1000)
 		pthread_cond_wait(&cvar, &add_queue);
@@ -213,11 +253,17 @@ void *utilizador()
     pthread_mutex_unlock(&add_queue);
     if((private_fifo = open(fifo_name, O_RDONLY))==-1)
         perror("erro\n");
+        printFAILD(&tmp);
+    }
     fflush(stdout);
-    read(private_fifo,&tmp, sizeof(request));
-    printf("OK -% i %i %i %f %i\n", tmp.i, tmp.pid, tmp.tid, tmp.dur, tmp.pl);
-    fflush(stdout);
+    read(private_fifo, &tmp, sizeof(request));
+    // printf("OK -% i %i %i %f %i\n", tmp.i, tmp.pid, tmp.tid, tmp.dur, tmp.pl);
+    if (tmp.pl != -1)
+        printIAMIN(&tmp);
+    else
+        printCLOSD(&tmp);
 
+    fflush(stdout);
 
     if (unlink(fifo_name))
         printf("Erro 3 (com '%s'): %s\n", fifo_name, strerror(errno));
