@@ -136,7 +136,7 @@ int main(int argc, char **argv)
             {
                 input.pl = i;
                 spots[i] = t;
-                if (!(i < maxFreeSpots))
+                if (i >= maxFreeSpots)
                 {
                     pthread_join(spots[i], NULL);
                 }
@@ -144,11 +144,11 @@ int main(int argc, char **argv)
             printf("OK - (Q.c) % i %i %i %f %i\n", input.i, input.pid, input.tid, input.dur, input.pl);
             pthread_create(&t, NULL, processRequest, NULL);
             i++;
-            if (i > maxFreeSpots)
+            if (i >= maxFreeSpots)
             {
                 i %= maxFreeSpots;
             }
-            usleep(1);
+            // usleep(1);
         }
     }
 
