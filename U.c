@@ -162,7 +162,7 @@ int main(int argc, char **argv)
     //printf("Started\n");
     fflush(stdout);
     double t = 0;
-    while ((t = timeSinceStartTime()) / 1000 < arguments.secs && out)
+    while ((t = timeSinceStartTime()) / 1000 <= arguments.secs && out)
     {
         msleep(1);
 	pthread_t t;

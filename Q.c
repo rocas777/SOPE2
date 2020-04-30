@@ -255,7 +255,7 @@ int main(int argc, char **argv)
     double ti;
     request input;
     //request u = {0,0,0,0,0};
-    while (((ti = timeSinceStartTime()) / 1000) < arguments.secs)
+    while (((ti = timeSinceStartTime()) / 1000) <= arguments.secs)
     {
 
         //pthread_mutex_lock(&access_input);
