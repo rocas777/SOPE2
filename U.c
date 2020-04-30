@@ -44,7 +44,7 @@ pthread_cond_t cvar = PTHREAD_COND_INITIALIZER;
 struct timeval *startTime;
 args arguments;
 
-long u=0;
+long u = 0;
 int msleep(long tms)
 {
     struct timespec ts;
@@ -75,37 +75,27 @@ double timeSinceStartTime()
     return (double)(instant.tv_sec - startTime->tv_sec) * 1000.0f + (instant.tv_usec - startTime->tv_usec) / 1000.0f;
 }
 
-void printRequest(request *req)
-{
-    printf("%f ; %i ; %i ; %i ; %f ; %i ; ", timeSinceStartTime(), req->i, req->pid, req->tid, req->dur, req->pl);
-    //fflush(stdout);
-}
-
 void printIWANT(request *req)
 {
-    printRequest(req);
-    printf("IWANT\n");
+    printf("%f ; %i ; %i ; %i ; %f ; %i ; IWANT\n", timeSinceStartTime(), req->i, req->pid, req->tid, req->dur, req->pl);
     fflush(stdout);
 }
 
 void printIAMIN(request *req)
 {
-    printRequest(req);
-    printf("IAMIN\n");
+    printf("%f ; %i ; %i ; %i ; %f ; %i ; IAMIN\n", timeSinceStartTime(), req->i, req->pid, req->tid, req->dur, req->pl);
     fflush(stdout);
 }
 
 void printCLOSD(request *req)
 {
-    printRequest(req);
-    printf("CLOSD\n");
+    printf("%f ; %i ; %i ; %i ; %f ; %i ; CLOSD\n", timeSinceStartTime(), req->i, req->pid, req->tid, req->dur, req->pl);
     fflush(stdout);
 }
 
 void printFAILD(request *req)
 {
-    printRequest(req);
-    printf("FAILD\n");
+    printf("%f ; %i ; %i ; %i ; %f ; %i ; FAILD\n", timeSinceStartTime(), req->i, req->pid, req->tid, req->dur, req->pl);
     fflush(stdout);
 }
 
@@ -147,7 +137,7 @@ int out = 1;
 
 int threads = 0;
 
-int gid=0;
+int gid = 0;
 
 int main(int argc, char **argv)
 {
@@ -159,52 +149,44 @@ int main(int argc, char **argv)
     //printf("FIFO at '%s' created and opened with success!\n", arguments.fifoname);
 
     //loop principal
-    //printf("Started\n");
     fflush(stdout);
     double t = 0;
     while ((t = timeSinceStartTime()) / 1000 < arguments.secs && out)
     {
         msleep(1);
-	pthread_t t;
+        pthread_t t;
         int err;
-	pthread_mutex_lock(&t_queue);
-		threads++;
-		if(threads>5000)
-			pthread_cond_wait(&tvar, &t_queue);
-	pthread_mutex_unlock(&t_queue);
+        pthread_mutex_lock(&t_queue);
+        threads++;
+        if (threads > 5000)
+            pthread_cond_wait(&tvar, &t_queue);
+        pthread_mutex_unlock(&t_queue);
 
-        while ((err = pthread_create(&t, NULL, utilizador, NULL))){
+        while ((err = pthread_create(&t, NULL, utilizador, NULL)))
+        {
             printf("Erro 1: %i\n", threads);
-	    msleep(1);	
-	}
-	if(i>u)
-		u=i;
-
+            msleep(1);
+        }
+        if (i > u)
+            u = i;
     }
-    //printf("Thread creation Ended\n");
 
     //free threads
 
     msleep(10);
-    printf("Erro 2: %i\n",threads);
+    printf("Erro 2: %i\n", threads);
 
-    printf("Program Ended %li\n",u);
+    printf("Program Ended %li\n", u);
 
     close(fifo);
     free(startTime);
     free(queue);
 
-    //char tt[1000];
-    //sprintf(tt,"rm /tmp/*%i*",getpid());
-    //printf("%s\n",tt);
-    //system(tt);
     exit(0);
 }
 
 void *utilizador()
 {
-
-    //int u=0;
     //gera tempo aleatório
     unsigned seed = time(NULL) + i;
     int dur = rand_r(&seed) % 49 + 1;
@@ -212,7 +194,6 @@ void *utilizador()
     //incrementa o i, apenas um pode aceder de cada vez
     pthread_mutex_lock(&add_i);
     i++;
-    //printf("in - (U.c) % i\n", i);
     pthread_mutex_unlock(&add_i);
 
     //cria a struct request que vai ser enviada para o fifo
@@ -225,7 +206,7 @@ void *utilizador()
     sprintf(fifo_name, "%i.%i", tmp.pid, tmp.tid);
     sprintf(tmp_, "/tmp/%s", fifo_name);
     sprintf(fifo_name, "%s", tmp_);
-    //printf("MkFifo - (U.c) % i\n", i);
+
     if (mkfifo(fifo_name, 0600) < 0)
     {
         //Cria a fifo privada e analiza se é válida.
@@ -233,53 +214,41 @@ void *utilizador()
         exit(errno);
     }
 
-    //pthread_mutex_lock(&write_fifo);
-    //printf("Be -% i %i %i %f %i\n", tmp.i, tmp.pid, tmp.tid, tmp.dur, tmp.pl);
     if (!file_exists(arguments.fifoname) || write(fifo, &tmp, sizeof(request)) == -1)
     {
-            	if (unlink(fifo_name))
-        		printf("Erro 3 (com '%s'): %s\n", fifo_name, strerror(errno));
+        if (unlink(fifo_name))
+            printf("Erro 3 (com '%s'): %s\n", fifo_name, strerror(errno));
 
-    		pthread_mutex_lock(&add_queue);
-			arr_size--;
-		if(arr_size<1000)
-			pthread_cond_signal(&cvar);
-    		pthread_mutex_unlock(&add_queue);
-    		//printf("out - (U.c) % i\n\n", tmp.i);
+        pthread_mutex_lock(&add_queue);
+        arr_size--;
+        if (arr_size < 1000)
+            pthread_cond_signal(&cvar);
+        pthread_mutex_unlock(&add_queue);
 
-		pthread_mutex_lock(&t_queue);
-			threads--;
-			if(threads<5000)
-				pthread_cond_signal(&tvar);
-		pthread_mutex_unlock(&t_queue);
-		out=0;
-    		pthread_exit(NULL);
+        pthread_mutex_lock(&t_queue);
+        threads--;
+        if (threads < 5000)
+            pthread_cond_signal(&tvar);
+        pthread_mutex_unlock(&t_queue);
+        out = 0;
+        pthread_exit(NULL);
     }
     printIWANT(&tmp);
-    //printf("Wrote\n");
     fflush(stdout);
 
-    //pthread_mutex_unlock(&write_fifo);
-    //printf("Escreveu\n");
-
-    //abre o fifo privado
-    //printf("Abriu\n");
-
-    //lê do fifo_privado
-    //msleep(10);
-
     pthread_mutex_lock(&add_queue);
-	if(arr_size>= 1000)
-		pthread_cond_wait(&cvar, &add_queue);
-	arr_size++;
+    if (arr_size >= 1000)
+        pthread_cond_wait(&cvar, &add_queue);
+    arr_size++;
     pthread_mutex_unlock(&add_queue);
-    if((private_fifo = open(fifo_name, O_RDONLY))==-1){
+    if ((private_fifo = open(fifo_name, O_RDONLY)) == -1)
+    {
         perror("erro\n");
         printFAILD(&tmp);
     }
     fflush(stdout);
     read(private_fifo, &tmp, sizeof(request));
-    // printf("OK -% i %i %i %f %i\n", tmp.i, tmp.pid, tmp.tid, tmp.dur, tmp.pl);
+
     if (tmp.pl != -1)
         printIAMIN(&tmp);
     else
@@ -296,16 +265,16 @@ void *utilizador()
     //queue thread
 
     pthread_mutex_lock(&add_queue);
-	arr_size--;
-	if(arr_size<1000)
-		pthread_cond_signal(&cvar);
+    arr_size--;
+    if (arr_size < 1000)
+        pthread_cond_signal(&cvar);
     pthread_mutex_unlock(&add_queue);
     //printf("out - (U.c) % i\n\n", tmp.i);
 
-	pthread_mutex_lock(&t_queue);
-		threads--;
-		if(threads<5000)
-			pthread_cond_signal(&tvar);
-	pthread_mutex_unlock(&t_queue);
+    pthread_mutex_lock(&t_queue);
+    threads--;
+    if (threads < 5000)
+        pthread_cond_signal(&tvar);
+    pthread_mutex_unlock(&t_queue);
     pthread_exit(NULL);
 }
