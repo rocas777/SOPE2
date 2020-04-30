@@ -227,13 +227,8 @@ int main(int argc, char **argv)
     fifo = open(arguments.fifoname, O_RDONLY | O_NONBLOCK); //abre a fifo pública
     double ti;
     request input;
-<<<<<<< HEAD
-    //request u = {0,0,0,0,0};
-    while (((ti = timeSinceStartTime()) / 1000) <= arguments.secs)
-=======
 
-    while (((ti = timeSinceStartTime()) / 1000) < arguments.secs + 0.3)
->>>>>>> 2981b06a26930ab4a2dbb7d1b81f401727b48d64
+    while (((ti = timeSinceStartTime()) / 1000) <= arguments.secs)
     {
 
         if (read(fifo, &input, sizeof(input)) > 0)
@@ -259,6 +254,28 @@ int main(int argc, char **argv)
 
     if (unlink(arguments.fifoname))
         printf("Erro 2 (com '%i'): %s\n", fifo, strerror(errno));
+
+    while (read(fifo, &input, sizeof(input)) > 0)
+        {
+            fflush(stdout);
+            printRECVD(&input);
+
+            if (ti / 1000 > arguments.secs)
+                input.dur = -1;
+            request *tmp_r = malloc(sizeof(request));
+            memcpy(tmp_r, &input, sizeof(request));
+            pthread_t t;
+            pthread_mutex_lock(&t_queue);
+            threads++;
+            if (threads > 5000)
+                pthread_cond_wait(&tvar, &t_queue);
+            pthread_mutex_unlock(&t_queue);
+            while (pthread_create(&t, NULL, processRequest, tmp_r))
+            {
+            }
+        }
+    while(threads)
+	msleep(1);
 
     // int u;
     // msleep(10);
