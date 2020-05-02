@@ -199,6 +199,9 @@ void *utilizador()
     //cria a struct request que vai ser enviada para o fifo
     request tmp = {i, getpid(), gettid(), dur, -1};
 
+    printIWANT(&tmp);
+    fflush(stdout);
+
     //cria o fifo privado
     int private_fifo;
     char fifo_name[599];
@@ -218,25 +221,23 @@ void *utilizador()
     {
         printFAILD(&tmp);
 
-        // if (unlink(fifo_name))
-        //     printf("Erro 3 (com '%s'): %s\n", fifo_name, strerror(errno));
+        if (unlink(fifo_name))
+            printf("Erro 3 (com '%s'): %s\n", fifo_name, strerror(errno));
 
-        // pthread_mutex_lock(&add_queue);
-        // arr_size--;
-        // if (arr_size < 1000)
-        //     pthread_cond_signal(&cvar);
-        // pthread_mutex_unlock(&add_queue);
+        pthread_mutex_lock(&add_queue);
+        arr_size--;
+        if (arr_size < 1000)
+            pthread_cond_signal(&cvar);
+        pthread_mutex_unlock(&add_queue);
 
-        // pthread_mutex_lock(&t_queue);
-        // threads--;
-        // if (threads < 5000)
-        //     pthread_cond_signal(&tvar);
-        // pthread_mutex_unlock(&t_queue);
-        // out = 0;
-        // pthread_exit(NULL);
+        pthread_mutex_lock(&t_queue);
+        threads--;
+        if (threads < 5000)
+            pthread_cond_signal(&tvar);
+        pthread_mutex_unlock(&t_queue);
+        out = 0;
+        pthread_exit(NULL);
     }
-    printIWANT(&tmp);
-    fflush(stdout);
 
     pthread_mutex_lock(&add_queue);
     if (arr_size >= 1000)
