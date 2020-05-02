@@ -118,14 +118,12 @@ void load_args(int argc, char **argv)
     }
 }
 
-pthread_t *queue;
 int max = 100;
 void init(int argc, char **argv)
 {
     startTime = malloc(sizeof(struct timeval));
     gettimeofday(startTime, 0);
     load_args(argc, argv);
-    queue = malloc(sizeof(pthread_t) * max);
 }
 int arr_size = 0;
 
@@ -180,7 +178,6 @@ int main(int argc, char **argv)
 
     close(fifo);
     free(startTime);
-    free(queue);
 
     exit(0);
 }
@@ -205,10 +202,7 @@ void *utilizador()
     //cria o fifo privado
     int private_fifo;
     char fifo_name[599];
-    char tmp_[599];
-    sprintf(fifo_name, "%i.%i", tmp.pid, tmp.tid);
-    sprintf(tmp_, "/tmp/%s", fifo_name);
-    sprintf(fifo_name, "%s", tmp_);
+    sprintf(fifo_name, "/tmp/%i.%i", tmp.pid, tmp.tid);
 
     if (mkfifo(fifo_name, 0600) < 0)
     {

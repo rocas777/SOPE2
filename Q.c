@@ -57,10 +57,6 @@ pthread_cond_t tvar = PTHREAD_COND_INITIALIZER;
 
 struct timeval *startTime;
 args arguments;
-pthread_t *queue;
-int max = 100;
-int maxFreeSpots = MAX_THREAD;
-pthread_t *spots;
 long int arr_size = 0;
 int threads = 0;
 int msleep(long tms)
@@ -147,8 +143,6 @@ void init(int argc, char **argv)
     startTime = malloc(sizeof(struct timeval));
     gettimeofday(startTime, 0);
     load_args(argc, argv);
-    queue = malloc(sizeof(pthread_t) * max);
-    spots = malloc(sizeof(pthread_t) * maxFreeSpots + 1);
 
     if (mkfifo(arguments.fifoname, 0600) < 0)
     {
@@ -167,10 +161,7 @@ void *processRequest(void *input)
     free(input);
 
     char fifoLoad[599];
-    char tmp_[599];
-    sprintf(fifoLoad, "%i.%i", local.pid, local.tid);
-    sprintf(tmp_, "/tmp/%s", fifoLoad);
-    sprintf(fifoLoad, "%s", tmp_);
+    sprintf(fifoLoad, "/tmp/%i.%i", local.pid, local.tid);
     int tmp;
     pthread_mutex_lock(&add_queue);
     arr_size++;
@@ -295,7 +286,6 @@ int main(int argc, char **argv)
         msleep(1);
 
     free(startTime);
-    free(queue);
     close(fifo);
     exit(0);
 }
