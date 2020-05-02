@@ -243,8 +243,8 @@ void *utilizador()
     pthread_mutex_unlock(&add_queue);
     if ((private_fifo = open(fifo_name, O_RDONLY)) == -1)
     {
-        perror("erro\n");
         printFAILD(&tmp);
+        perror("erro\n");
     }
     fflush(stdout);
     read(private_fifo, &tmp, sizeof(request));
