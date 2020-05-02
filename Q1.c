@@ -12,6 +12,7 @@
 #include "types.h"
 #include <sys/syscall.h>
 #include <stdbool.h> // bool type
+#include <time.h>
 
 #define ATTEMPTS 1000000
 
@@ -29,6 +30,7 @@ bool file_exists(char *filename)
     return (stat(filename, &buffer) == 0);
 }
 
+time_t start;
 
 pthread_mutex_t place_mod = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t access_input = PTHREAD_MUTEX_INITIALIZER;
@@ -65,7 +67,7 @@ int msleep(long tms)
     return ret;
 }
 
-double timeSinceStartTime()
+double timeSinceStarttime()
 {
     struct timeval instant;
     gettimeofday(&instant, 0);
@@ -75,36 +77,38 @@ double timeSinceStartTime()
 
 void printRECVD(request *req)
 {
-    printf("%f ; %i ; %i ; %i ; %f ; %i ; RECVD\n", timeSinceStartTime(), req->i, req->pid, req->tid, req->dur, req->pl);
+    printf("%li ; %i ; %i ; %i ; %f ; %i ; RECVD\n", time(NULL)-start, req->i, req->pid, req->tid, req->dur, req->pl);
     fflush(stdout);
 }
 
 void printENTER(request *req)
 {
-    printf("%f ; %i ; %i ; %i ; %f ; %i ; ENTER\n", timeSinceStartTime(), req->i, req->pid, req->tid, req->dur, req->pl);
+    printf("%li ; %i ; %i ; %i ; %f ; %i ; ENTER\n", time(NULL)-start, req->i, req->pid, req->tid, req->dur, req->pl);
     fflush(stdout);
 }
 
 void printTIMUP(request *req)
 {
-    printf("%f ; %i ; %i ; %i ; %f ; %i ; TIMUP\n", timeSinceStartTime(), req->i, req->pid, req->tid, req->dur, req->pl);
+    printf("%li ; %i ; %i ; %i ; %f ; %i ; TIMUP\n", time(NULL)-start, req->i, req->pid, req->tid, req->dur, req->pl);
     fflush(stdout);
 }
 
 void print2LATE(request *req)
 {
-    printf("%f ; %i ; %i ; %i ; %f ; %i ; 2LATE\n", timeSinceStartTime(), req->i, req->pid, req->tid, req->dur, req->pl);
+    printf("%li ; %i ; %i ; %i ; %f ; %i ; 2LATE\n", time(NULL)-start, req->i, req->pid, req->tid, req->dur, req->pl);
     fflush(stdout);
 }
 
 void printGAVUP(request *req)
 {
-    printf("%f ; %i ; %i ; %i ; %f ; %i ; GAVUP\n", timeSinceStartTime(), req->i, req->pid, req->tid, req->dur, req->pl);
+    printf("%li ; %i ; %i ; %i ; %f ; %i ; GAVUP\n", time(NULL)-start, req->i, req->pid, req->tid, req->dur, req->pl);
     fflush(stdout);
 }
 
-void load_args(int argc, char **argv)
+int load_args(int argc, char **argv)
 {
+    arguments.secs=0;
+    arguments.fifoname="";
     for (int i = 1; i < argc; i++)
     {
         argv++;
@@ -120,19 +124,28 @@ void load_args(int argc, char **argv)
             arguments.fifoname = *argv;
         }
     }
+    if(arguments.secs == 0){
+	printf("ERRO nos Parametros!\n");
+	return 1;
+    }
+    return 0;
 }
 
-void init(int argc, char **argv)
+int init(int argc, char **argv)
 {
     startTime = malloc(sizeof(struct timeval));
     gettimeofday(startTime, 0);
-    load_args(argc, argv);
+    if(load_args(argc, argv))
+	return 1;
 
     if (mkfifo(arguments.fifoname, 0600) < 0)
     {
         //Cria a fifo publica e analiza se é válida.
         perror("ERROR setting up FIFO on main() of Q.c ");
+	return 1;
     }
+    start=time(NULL);
+    return 0;
 }
 
 long int place = 0;
@@ -217,12 +230,13 @@ int fifo;
 
 int main(int argc, char **argv)
 {
-    init(argc, argv);
+    if(init(argc, argv))
+	exit(1);
     fifo = open(arguments.fifoname, O_RDONLY | O_NONBLOCK); //abre a fifo pública
     double ti;
     request input;
 
-    while (((ti = timeSinceStartTime()) / 1000) <= arguments.secs)
+    while (((ti = timeSinceStarttime()) / 1000) <= arguments.secs)
     {
 
         if (read(fifo, &input, sizeof(input)) > 0)

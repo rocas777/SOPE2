@@ -1,9 +1,9 @@
 all: U Q
 
 U:
-	gcc -o U U.c -pthread -Wall -Werror
+	gcc -o U1 U1.c -pthread -Wall -Werror
 Q:	
-	gcc -o Q Q.c -pthread -Wall -Werror
+	gcc -o Q1 Q1.c -pthread -Wall -Werror
 
 clean:
-	rm U && rm Q
+	rm U1 && rm Q1

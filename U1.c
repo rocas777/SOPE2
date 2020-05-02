@@ -11,6 +11,7 @@
 #include <unistd.h>
 #include "types.h"
 #include <sys/syscall.h>
+#include <time.h>
 
 #include <sys/stat.h> // stat
 #include <stdbool.h>  // bool type
@@ -44,6 +45,8 @@ pthread_cond_t cvar = PTHREAD_COND_INITIALIZER;
 struct timeval *startTime;
 args arguments;
 
+time_t start;
+
 long u = 0;
 int msleep(long tms)
 {
@@ -67,7 +70,7 @@ int msleep(long tms)
     return ret;
 }
 
-double timeSinceStartTime()
+double timeSinceStarttime()
 {
     struct timeval instant;
     gettimeofday(&instant, 0);
@@ -77,30 +80,32 @@ double timeSinceStartTime()
 
 void printIWANT(request *req)
 {
-    printf("%f ; %i ; %i ; %i ; %f ; %i ; IWANT\n", timeSinceStartTime(), req->i, req->pid, req->tid, req->dur, req->pl);
+    printf("%li ; %i ; %i ; %i ; %f ; %i ; IWANT\n", time(NULL)-start, req->i, req->pid, req->tid, req->dur, req->pl);
     fflush(stdout);
 }
 
 void printIAMIN(request *req)
 {
-    printf("%f ; %i ; %i ; %i ; %f ; %i ; IAMIN\n", timeSinceStartTime(), req->i, req->pid, req->tid, req->dur, req->pl);
+    printf("%li ; %i ; %i ; %i ; %f ; %i ; IAMIN\n", time(NULL)-start, req->i, req->pid, req->tid, req->dur, req->pl);
     fflush(stdout);
 }
 
 void printCLOSD(request *req)
 {
-    printf("%f ; %i ; %i ; %i ; %f ; %i ; CLOSD\n", timeSinceStartTime(), req->i, req->pid, req->tid, req->dur, req->pl);
+    printf("%li ; %i ; %i ; %i ; %f ; %i ; CLOSD\n", time(NULL)-start, req->i, req->pid, req->tid, req->dur, req->pl);
     fflush(stdout);
 }
 
 void printFAILD(request *req)
 {
-    printf("%f ; %i ; %i ; %i ; %f ; %i ; FAILD\n", timeSinceStartTime(), req->i, req->pid, req->tid, req->dur, req->pl);
+    printf("%li ; %i ; %i ; %i ; %f ; %i ; FAILD\n", time(NULL)-start, req->i, req->pid, req->tid, req->dur, req->pl);
     fflush(stdout);
 }
 
-void load_args(int argc, char **argv)
-{
+int load_args(int argc, char **argv)
+{    
+    arguments.secs=0;
+    arguments.fifoname="";
     for (int i = 1; i < argc; i++)
     {
         argv++;
@@ -116,14 +121,22 @@ void load_args(int argc, char **argv)
             arguments.fifoname = *argv;
         }
     }
+    if(arguments.secs == 0){
+	printf("ERRO nos Parametros!\n");
+	return 1;
+    }
+    return 0;
 }
 
 int max = 100;
-void init(int argc, char **argv)
+int init(int argc, char **argv)
 {
     startTime = malloc(sizeof(struct timeval));
     gettimeofday(startTime, 0);
-    load_args(argc, argv);
+    if(load_args(argc, argv))
+	return 1;
+    start=time(NULL);
+    return 0;
 }
 int arr_size = 0;
 
@@ -139,7 +152,8 @@ int gid = 0;
 
 int main(int argc, char **argv)
 {
-    init(argc, argv);
+    if(init(argc, argv))
+	exit(1);
 
     //abre a fifo pública
     fifo = open(arguments.fifoname, O_WRONLY);
@@ -147,7 +161,7 @@ int main(int argc, char **argv)
     //loop principal
     fflush(stdout);
     double t = 0;
-    while ((t = timeSinceStartTime()) / 1000 <= arguments.secs && out)
+    while ((t = timeSinceStarttime()) / 1000 <= arguments.secs && out)
     {
         msleep(1);
         pthread_t t;
@@ -169,7 +183,7 @@ int main(int argc, char **argv)
 
     while(threads){
 	msleep(1);
-	if(timeSinceStartTime()-t>51)
+	if(timeSinceStarttime()-t>51)
 		break;
     }
 
