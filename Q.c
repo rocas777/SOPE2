@@ -11,7 +11,7 @@
 #include <unistd.h>
 #include "types.h"
 #include <sys/syscall.h>
-#include <stdbool.h>  // bool type
+#include <stdbool.h> // bool type
 
 #define ATTEMPTS 1000000
 
@@ -196,6 +196,18 @@ void *processRequest(void *input)
         printGAVUP(&local);
         fprintf(stderr, "ERRO 2\n");
         fflush(stderr);
+
+        pthread_mutex_lock(&add_queue);
+        arr_size--;
+        if (arr_size < 1000)
+            pthread_cond_signal(&cvar);
+        pthread_mutex_unlock(&add_queue);
+
+        pthread_mutex_lock(&t_queue);
+        threads--;
+        if (threads < 5000)
+            pthread_cond_signal(&tvar);
+        pthread_mutex_unlock(&t_queue);
         pthread_exit(NULL);
     }
 
