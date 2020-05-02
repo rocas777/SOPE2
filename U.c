@@ -216,22 +216,24 @@ void *utilizador()
 
     if (!file_exists(arguments.fifoname) || write(fifo, &tmp, sizeof(request)) == -1)
     {
-        if (unlink(fifo_name))
-            printf("Erro 3 (com '%s'): %s\n", fifo_name, strerror(errno));
+        printFAILD(&tmp);
 
-        pthread_mutex_lock(&add_queue);
-        arr_size--;
-        if (arr_size < 1000)
-            pthread_cond_signal(&cvar);
-        pthread_mutex_unlock(&add_queue);
+        // if (unlink(fifo_name))
+        //     printf("Erro 3 (com '%s'): %s\n", fifo_name, strerror(errno));
 
-        pthread_mutex_lock(&t_queue);
-        threads--;
-        if (threads < 5000)
-            pthread_cond_signal(&tvar);
-        pthread_mutex_unlock(&t_queue);
-        out = 0;
-        pthread_exit(NULL);
+        // pthread_mutex_lock(&add_queue);
+        // arr_size--;
+        // if (arr_size < 1000)
+        //     pthread_cond_signal(&cvar);
+        // pthread_mutex_unlock(&add_queue);
+
+        // pthread_mutex_lock(&t_queue);
+        // threads--;
+        // if (threads < 5000)
+        //     pthread_cond_signal(&tvar);
+        // pthread_mutex_unlock(&t_queue);
+        // out = 0;
+        // pthread_exit(NULL);
     }
     printIWANT(&tmp);
     fflush(stdout);
@@ -247,13 +249,20 @@ void *utilizador()
         perror("erro\n");
     }
     fflush(stdout);
-    read(private_fifo, &tmp, sizeof(request));
 
-    if (tmp.pl != -1)
-        printIAMIN(&tmp);
+    // read(private_fifo, &tmp, sizeof(request));
+
+    if (!file_exists(fifo_name) || read(private_fifo, &tmp, sizeof(request)) == -1)
+    {
+        printFAILD(&tmp);
+    }
     else
-        printCLOSD(&tmp);
-
+    {
+        if (tmp.pl != -1)
+            printIAMIN(&tmp);
+        else
+            printCLOSD(&tmp);
+    }
     fflush(stdout);
 
     if (unlink(fifo_name))

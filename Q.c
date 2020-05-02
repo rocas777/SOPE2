@@ -11,6 +11,7 @@
 #include <unistd.h>
 #include "types.h"
 #include <sys/syscall.h>
+#include <stdbool.h>  // bool type
 
 #define ATTEMPTS 1000000
 
@@ -24,6 +25,12 @@ struct
 pid_t gettid()
 {
     return syscall(SYS_gettid);
+}
+
+bool file_exists(char *filename)
+{
+    struct stat buffer;
+    return (stat(filename, &buffer) == 0);
 }
 
 void delay(int number_of_seconds)
@@ -183,7 +190,8 @@ void *processRequest(void *input)
     }
 
     pthread_mutex_unlock(&place_mod);
-    if (write(tmp, &local, sizeof(request)) == -1)
+
+    if (!file_exists(fifoLoad) || write(tmp, &local, sizeof(request)) == -1)
     {
         printGAVUP(&local);
         fprintf(stderr, "ERRO 2\n");
