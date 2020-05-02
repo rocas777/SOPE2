@@ -21,7 +21,7 @@ struct
     char *fifoname;
 } typedef args;
 
-//por alguma razão o gettid não estava definido
+
 pid_t gettid()
 {
     return syscall(SYS_gettid);
@@ -141,10 +141,8 @@ int main(int argc, char **argv)
 {
     init(argc, argv);
 
-    fifo = open(arguments.fifoname, O_WRONLY);
     //abre a fifo pública
-
-    //printf("FIFO at '%s' created and opened with success!\n", arguments.fifoname);
+    fifo = open(arguments.fifoname, O_WRONLY);
 
     //loop principal
     fflush(stdout);
@@ -162,19 +160,18 @@ int main(int argc, char **argv)
 
         while ((err = pthread_create(&t, NULL, utilizador, NULL)))
         {
-            printf("Erro 1: %i\n", threads);
             msleep(1);
         }
         if (i > u)
             u = i;
     }
 
-    //free threads
 
-    msleep(10);
-    printf("Erro 2: %i\n", threads);
-
-    printf("Program Ended %li\n", u);
+    while(threads){
+	msleep(1);
+	if(timeSinceStartTime()-t>51)
+		break;
+    }
 
     close(fifo);
     free(startTime);
@@ -216,7 +213,7 @@ void *utilizador()
         printFAILD(&tmp);
 
         if (unlink(fifo_name))
-            printf("Erro 3 (com '%s'): %s\n", fifo_name, strerror(errno));
+            printf("Erro (com '%s'): %s\n", fifo_name, strerror(errno));
 
         pthread_mutex_lock(&add_queue);
         arr_size--;
@@ -245,8 +242,6 @@ void *utilizador()
     }
     fflush(stdout);
 
-    // read(private_fifo, &tmp, sizeof(request));
-
     if (!file_exists(fifo_name) || read(private_fifo, &tmp, sizeof(request)) == -1)
     {
         printFAILD(&tmp);
@@ -261,19 +256,16 @@ void *utilizador()
     fflush(stdout);
 
     if (unlink(fifo_name))
-        printf("Erro 3 (com '%s'): %s\n", fifo_name, strerror(errno));
+        printf("Erro (com '%s'): %s\n", fifo_name, strerror(errno));
 
     if (close(private_fifo))
-        printf("Erro 4:%s\n", strerror(errno));
-
-    //queue thread
+        printf("Erro :%s\n", strerror(errno));
 
     pthread_mutex_lock(&add_queue);
     arr_size--;
     if (arr_size < 1000)
         pthread_cond_signal(&cvar);
     pthread_mutex_unlock(&add_queue);
-    //printf("out - (U.c) % i\n\n", tmp.i);
 
     pthread_mutex_lock(&t_queue);
     threads--;

@@ -22,10 +22,6 @@ struct
 } typedef args;
 
 //por alguma razão o gettid não estava definido
-pid_t gettid()
-{
-    return syscall(SYS_gettid);
-}
 
 bool file_exists(char *filename)
 {
@@ -33,18 +29,6 @@ bool file_exists(char *filename)
     return (stat(filename, &buffer) == 0);
 }
 
-void delay(int number_of_seconds)
-{
-    // Converting time into milli_seconds
-    int milli_seconds = 1000 * number_of_seconds;
-
-    // Storing start time
-    clock_t start_time = clock();
-
-    // looping till required time is not achieved
-    while (clock() < start_time + milli_seconds)
-        ;
-}
 
 pthread_mutex_t place_mod = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t access_input = PTHREAD_MUTEX_INITIALIZER;
@@ -148,7 +132,6 @@ void init(int argc, char **argv)
     {
         //Cria a fifo publica e analiza se é válida.
         perror("ERROR setting up FIFO on main() of Q.c ");
-        //exit(errno);
     }
 }
 
@@ -262,7 +245,7 @@ int main(int argc, char **argv)
     }
 
     if (unlink(arguments.fifoname))
-        printf("Erro 2 (com '%i'): %s\n", fifo, strerror(errno));
+        printf("Erro (com '%i'): %s\n", fifo, strerror(errno));
 
     while (read(fifo, &input, sizeof(input)) > 0)
     {
