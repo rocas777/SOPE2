@@ -213,7 +213,7 @@ void *utilizador()
         printFAILD(&tmp);
 
         if (unlink(fifo_name))
-            printf("Erro (com '%s'): %s\n", fifo_name, strerror(errno));
+            fprintf(stderr,"Erro (com '%s'): %s\n", fifo_name, strerror(errno));
 
         pthread_mutex_lock(&add_queue);
         arr_size--;
@@ -256,10 +256,10 @@ void *utilizador()
     fflush(stdout);
 
     if (unlink(fifo_name))
-        printf("Erro (com '%s'): %s\n", fifo_name, strerror(errno));
+        fprintf(stderr,"Erro (com '%s'): %s\n", fifo_name, strerror(errno));
 
     if (close(private_fifo))
-        printf("Erro :%s\n", strerror(errno));
+        fprintf(stderr,"Erro :%s\n", strerror(errno));
 
     pthread_mutex_lock(&add_queue);
     arr_size--;

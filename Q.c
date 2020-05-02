@@ -245,7 +245,7 @@ int main(int argc, char **argv)
     }
 
     if (unlink(arguments.fifoname))
-        printf("Erro (com '%i'): %s\n", fifo, strerror(errno));
+        fprintf(stderr,"Erro (com '%i'): %s\n", fifo, strerror(errno));
 
     while (read(fifo, &input, sizeof(input)) > 0)
     {
