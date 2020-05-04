@@ -2,8 +2,6 @@
 #define TYPES_H
 #include <sys/types.h>
 
-#define MAX_THREAD 1020
-
 struct{
     int i;
     pid_t pid;

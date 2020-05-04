@@ -19,6 +19,8 @@
 struct
 {
     long unsigned secs;
+    int nplaces;
+    int nthreads;
     char *fifoname;
 } typedef args;
 
@@ -33,6 +35,7 @@ bool file_exists(char *filename)
 time_t start;
 
 pthread_mutex_t place_mod = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t pvar = PTHREAD_COND_INITIALIZER;
 pthread_mutex_t access_input = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t add_queue = PTHREAD_MUTEX_INITIALIZER;
 
@@ -75,40 +78,72 @@ double timeSinceStarttime()
     return (double)(instant.tv_sec - startTime->tv_sec) * 1000.0f + (instant.tv_usec - startTime->tv_usec) / 1000.0f;
 }
 
+// void printRECVD(request *req)
+// {
+//     printf("%f ; %i ; %i ; %i ; %f ; %i ; RECVD\n", timeSinceStarttime(), req->i, req->pid, req->tid, req->dur, req->pl);
+//     fflush(stdout);
+// }
+
+// void printENTER(request *req)
+// {
+//     printf("%f ; %i ; %i ; %i ; %f ; %i ; ENTER\n", timeSinceStarttime(), req->i, req->pid, req->tid, req->dur, req->pl);
+//     fflush(stdout);
+// }
+
+// void printTIMUP(request *req)
+// {
+//     printf("%f ; %i ; %i ; %i ; %f ; %i ; TIMUP\n", timeSinceStarttime(), req->i, req->pid, req->tid, req->dur, req->pl);
+//     fflush(stdout);
+// }
+
+// void print2LATE(request *req)
+// {
+//     printf("%f ; %i ; %i ; %i ; %f ; %i ; 2LATE\n", timeSinceStarttime(), req->i, req->pid, req->tid, req->dur, req->pl);
+//     fflush(stdout);
+// }
+
+// void printGAVUP(request *req)
+// {
+//     printf("%f ; %i ; %i ; %i ; %f ; %i ; GAVUP\n", timeSinceStarttime(), req->i, req->pid, req->tid, req->dur, req->pl);
+//     fflush(stdout);
+// }
+
 void printRECVD(request *req)
 {
-    printf("%li ; %i ; %i ; %i ; %f ; %i ; RECVD\n", time(NULL)-start, req->i, req->pid, req->tid, req->dur, req->pl);
+    printf("%li ; %i ; %i ; %i ; %f ; %i ; RECVD\n", time(NULL) - start, req->i, req->pid, req->tid, req->dur, req->pl);
     fflush(stdout);
 }
 
 void printENTER(request *req)
 {
-    printf("%li ; %i ; %i ; %i ; %f ; %i ; ENTER\n", time(NULL)-start, req->i, req->pid, req->tid, req->dur, req->pl);
+    printf("%li ; %i ; %i ; %i ; %f ; %i ; ENTER\n", time(NULL) - start, req->i, req->pid, req->tid, req->dur, req->pl);
     fflush(stdout);
 }
 
 void printTIMUP(request *req)
 {
-    printf("%li ; %i ; %i ; %i ; %f ; %i ; TIMUP\n", time(NULL)-start, req->i, req->pid, req->tid, req->dur, req->pl);
+    printf("%li ; %i ; %i ; %i ; %f ; %i ; TIMUP\n", time(NULL) - start, req->i, req->pid, req->tid, req->dur, req->pl);
     fflush(stdout);
 }
 
 void print2LATE(request *req)
 {
-    printf("%li ; %i ; %i ; %i ; %f ; %i ; 2LATE\n", time(NULL)-start, req->i, req->pid, req->tid, req->dur, req->pl);
+    printf("%li ; %i ; %i ; %i ; %f ; %i ; 2LATE\n", time(NULL) - start, req->i, req->pid, req->tid, req->dur, req->pl);
     fflush(stdout);
 }
 
 void printGAVUP(request *req)
 {
-    printf("%li ; %i ; %i ; %i ; %f ; %i ; GAVUP\n", time(NULL)-start, req->i, req->pid, req->tid, req->dur, req->pl);
+    printf("%li ; %i ; %i ; %i ; %f ; %i ; GAVUP\n", time(NULL) - start, req->i, req->pid, req->tid, req->dur, req->pl);
     fflush(stdout);
 }
 
 int load_args(int argc, char **argv)
 {
-    arguments.secs=0;
-    arguments.fifoname="";
+    arguments.secs = 0;
+    arguments.nplaces = __INT32_MAX__;
+    arguments.nthreads = 5000;
+    arguments.fifoname = "";
     for (int i = 1; i < argc; i++)
     {
         argv++;
@@ -119,36 +154,53 @@ int load_args(int argc, char **argv)
             argv++;
             arguments.secs = atoi(*argv);
         }
+        else if (strncmp(*argv, "-l", 2) == 0)
+        { // se for o argumento lotação do quarto de banho
+            i++;
+            argv++;
+            arguments.nplaces = atoi(*argv);
+        }
+        else if (strncmp(*argv, "-n", 2) == 0)
+        { // se for o argumento número máximo de threads a atender pedidos
+            i++;
+            argv++;
+            arguments.nthreads = atoi(*argv);
+        }
         else
         { // se for o argumento fifoname
             arguments.fifoname = *argv;
         }
     }
-    if(arguments.secs == 0){
-	printf("ERRO nos Parametros!\n");
-	return 1;
+    if (arguments.secs == 0)
+    {
+        printf("ERRO nos Parametros!\n");
+        return 1;
     }
     return 0;
 }
+
+long int place = 0;
+int *places;
+long int num_free_place = 0;
 
 int init(int argc, char **argv)
 {
     startTime = malloc(sizeof(struct timeval));
     gettimeofday(startTime, 0);
-    if(load_args(argc, argv))
-	return 1;
+    if (load_args(argc, argv))
+        return 1;
+
+    places = malloc(sizeof(int) * arguments.nplaces);
 
     if (mkfifo(arguments.fifoname, 0600) < 0)
     {
         //Cria a fifo publica e analiza se é válida.
         perror("ERROR setting up FIFO on main() of Q.c ");
-	return 1;
+        return 1;
     }
-    start=time(NULL);
+    start = time(NULL);
     return 0;
 }
-
-long int place = 0;
 
 void *processRequest(void *input)
 {
@@ -159,24 +211,43 @@ void *processRequest(void *input)
     char fifoLoad[599];
     sprintf(fifoLoad, "/tmp/%i.%i", local.pid, local.tid);
     int tmp;
+
     pthread_mutex_lock(&add_queue);
     arr_size++;
     if (arr_size >= 1000)
         pthread_cond_wait(&cvar, &add_queue);
     pthread_mutex_unlock(&add_queue);
+
     if ((tmp = open(fifoLoad, O_WRONLY)) == -1)
     {
         fprintf(stderr, "erro 1\n");
         fflush(stderr);
     }
-    pthread_mutex_lock(&place_mod);
 
+    pthread_mutex_lock(&place_mod);
     if (local.dur != -1)
     {
-        local.pl = ++place;
+        if (place <= arguments.nplaces)
+        {
+            local.pl = ++place;
+        }
+        else if (num_free_place > 0)
+        {
+            local.pl = places[--num_free_place];
+        }
+        else
+        {
+            pthread_cond_wait(&pvar, &place_mod);
+            local.pl = places[--num_free_place];
+        }
     }
-
     pthread_mutex_unlock(&place_mod);
+
+    if ((((timeSinceStarttime()) / 1000) > arguments.secs))
+    {
+        local.pl = -1;
+        local.dur = -1;
+    }
 
     if (!file_exists(fifoLoad) || write(tmp, &local, sizeof(request)) == -1)
     {
@@ -190,9 +261,14 @@ void *processRequest(void *input)
             pthread_cond_signal(&cvar);
         pthread_mutex_unlock(&add_queue);
 
+        pthread_mutex_lock(&place_mod);
+        places[num_free_place++] = local.pl;
+        pthread_cond_signal(&pvar);
+        pthread_mutex_unlock(&place_mod);
+
         pthread_mutex_lock(&t_queue);
         threads--;
-        if (threads < 5000)
+        if (threads < arguments.nthreads)
             pthread_cond_signal(&tvar);
         pthread_mutex_unlock(&t_queue);
         pthread_exit(NULL);
@@ -217,11 +293,17 @@ void *processRequest(void *input)
         print2LATE(&local);
     }
 
+    pthread_mutex_lock(&place_mod);
+    places[num_free_place++] = local.pl;
+    pthread_cond_signal(&pvar);
+    pthread_mutex_unlock(&place_mod);
+
     pthread_mutex_lock(&t_queue);
     threads--;
-    if (threads < 5000)
+    if (threads < arguments.nthreads)
         pthread_cond_signal(&tvar);
     pthread_mutex_unlock(&t_queue);
+
     pthread_exit(NULL);
 }
 
@@ -230,13 +312,12 @@ int fifo;
 
 int main(int argc, char **argv)
 {
-    if(init(argc, argv))
-	exit(1);
+    if (init(argc, argv))
+        exit(1);
     fifo = open(arguments.fifoname, O_RDONLY | O_NONBLOCK); //abre a fifo pública
-    double ti;
     request input;
 
-    while (((ti = timeSinceStarttime()) / 1000) <= arguments.secs)
+    while (((timeSinceStarttime()) / 1000) <= arguments.secs)
     {
 
         if (read(fifo, &input, sizeof(input)) > 0)
@@ -247,11 +328,13 @@ int main(int argc, char **argv)
             request *tmp_r = malloc(sizeof(request));
             memcpy(tmp_r, &input, sizeof(request));
             pthread_t t;
+
             pthread_mutex_lock(&t_queue);
             threads++;
-            if (threads > 5000)
+            if (threads > arguments.nthreads)
                 pthread_cond_wait(&tvar, &t_queue);
             pthread_mutex_unlock(&t_queue);
+
             while (pthread_create(&t, NULL, processRequest, tmp_r))
             {
             }
@@ -259,7 +342,7 @@ int main(int argc, char **argv)
     }
 
     if (unlink(arguments.fifoname))
-        fprintf(stderr,"Erro (com '%i'): %s\n", fifo, strerror(errno));
+        fprintf(stderr, "Erro (com '%i'): %s\n", fifo, strerror(errno));
 
     while (read(fifo, &input, sizeof(input)) > 0)
     {
@@ -270,17 +353,24 @@ int main(int argc, char **argv)
         request *tmp_r = malloc(sizeof(request));
         memcpy(tmp_r, &input, sizeof(request));
         pthread_t t;
+
         pthread_mutex_lock(&t_queue);
         threads++;
-        if (threads > 5000)
+        if (threads > arguments.nthreads)
             pthread_cond_wait(&tvar, &t_queue);
         pthread_mutex_unlock(&t_queue);
+
         while (pthread_create(&t, NULL, processRequest, tmp_r))
         {
         }
     }
-    while (threads)
-        msleep(1);
+
+    while (threads > 0)
+    {
+        pthread_mutex_lock(&t_queue);
+        pthread_cond_wait(&tvar, &t_queue);
+        pthread_mutex_unlock(&t_queue);
+    }
 
     free(startTime);
     close(fifo);

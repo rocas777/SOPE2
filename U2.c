@@ -22,7 +22,6 @@ struct
     char *fifoname;
 } typedef args;
 
-
 pid_t gettid()
 {
     return syscall(SYS_gettid);
@@ -78,6 +77,30 @@ double timeSinceStarttime()
     return (double)(instant.tv_sec - startTime->tv_sec) * 1000.0f + (instant.tv_usec - startTime->tv_usec) / 1000.0f;
 }
 
+// void printIWANT(request *req)
+// {
+//     printf("%f ; %i ; %i ; %i ; %f ; %i ; IWANT\n", timeSinceStarttime(), req->i, req->pid, req->tid, req->dur, req->pl);
+//     fflush(stdout);
+// }
+
+// void printIAMIN(request *req)
+// {
+//     printf("%f ; %i ; %i ; %i ; %f ; %i ; IAMIN\n", timeSinceStarttime(), req->i, req->pid, req->tid, req->dur, req->pl);
+//     fflush(stdout);
+// }
+
+// void printCLOSD(request *req)
+// {
+//     printf("%f ; %i ; %i ; %i ; %f ; %i ; CLOSD\n", timeSinceStarttime(), req->i, req->pid, req->tid, req->dur, req->pl);
+//     fflush(stdout);
+// }
+
+// void printFAILD(request *req)
+// {
+//     printf("%f ; %i ; %i ; %i ; %f ; %i ; FAILD\n", timeSinceStarttime(), req->i, req->pid, req->tid, req->dur, req->pl);
+//     fflush(stdout);
+// }
+
 void printIWANT(request *req)
 {
     printf("%li ; %i ; %i ; %i ; %f ; %i ; IWANT\n", time(NULL)-start, req->i, req->pid, req->tid, req->dur, req->pl);
@@ -103,9 +126,9 @@ void printFAILD(request *req)
 }
 
 int load_args(int argc, char **argv)
-{    
-    arguments.secs=0;
-    arguments.fifoname="";
+{
+    arguments.secs = 0;
+    arguments.fifoname = "";
     for (int i = 1; i < argc; i++)
     {
         argv++;
@@ -121,9 +144,10 @@ int load_args(int argc, char **argv)
             arguments.fifoname = *argv;
         }
     }
-    if(arguments.secs == 0){
-	printf("ERRO nos Parametros!\n");
-	return 1;
+    if (arguments.secs == 0)
+    {
+        printf("ERRO nos Parametros!\n");
+        return 1;
     }
     return 0;
 }
@@ -133,9 +157,9 @@ int init(int argc, char **argv)
 {
     startTime = malloc(sizeof(struct timeval));
     gettimeofday(startTime, 0);
-    if(load_args(argc, argv))
-	return 1;
-    start=time(NULL);
+    if (load_args(argc, argv))
+        return 1;
+    start = time(NULL);
     return 0;
 }
 int arr_size = 0;
@@ -152,8 +176,8 @@ int gid = 0;
 
 int main(int argc, char **argv)
 {
-    if(init(argc, argv))
-	exit(1);
+    if (init(argc, argv))
+        exit(1);
 
     //abre a fifo pública
     fifo = open(arguments.fifoname, O_WRONLY);
@@ -180,11 +204,11 @@ int main(int argc, char **argv)
             u = i;
     }
 
-
-    while(threads){
-	msleep(1);
-	if(timeSinceStarttime()-t>51)
-		break;
+    while (threads)
+    {
+        msleep(1);
+        if (timeSinceStarttime() - t > 51)
+            break;
     }
 
     close(fifo);
@@ -227,7 +251,7 @@ void *utilizador()
         printFAILD(&tmp);
 
         if (unlink(fifo_name))
-            fprintf(stderr,"Erro (com '%s'): %s\n", fifo_name, strerror(errno));
+            fprintf(stderr, "Erro (com '%s'): %s\n", fifo_name, strerror(errno));
 
         pthread_mutex_lock(&add_queue);
         arr_size--;
@@ -270,10 +294,10 @@ void *utilizador()
     fflush(stdout);
 
     if (unlink(fifo_name))
-        fprintf(stderr,"Erro (com '%s'): %s\n", fifo_name, strerror(errno));
+        fprintf(stderr, "Erro (com '%s'): %s\n", fifo_name, strerror(errno));
 
     if (close(private_fifo))
-        fprintf(stderr,"Erro :%s\n", strerror(errno));
+        fprintf(stderr, "Erro :%s\n", strerror(errno));
 
     pthread_mutex_lock(&add_queue);
     arr_size--;
