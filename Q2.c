@@ -268,8 +268,7 @@ void *processRequest(void *input)
 
         pthread_mutex_lock(&t_queue);
         threads--;
-        if (threads < arguments.nthreads)
-            pthread_cond_signal(&tvar);
+        pthread_cond_signal(&tvar);
         pthread_mutex_unlock(&t_queue);
         pthread_exit(NULL);
     }
@@ -300,8 +299,7 @@ void *processRequest(void *input)
 
     pthread_mutex_lock(&t_queue);
     threads--;
-    if (threads < arguments.nthreads)
-        pthread_cond_signal(&tvar);
+    pthread_cond_signal(&tvar);
     pthread_mutex_unlock(&t_queue);
 
     pthread_exit(NULL);
@@ -372,6 +370,7 @@ int main(int argc, char **argv)
         pthread_mutex_unlock(&t_queue);
     }
 
+    free(places);
     free(startTime);
     close(fifo);
     exit(0);
