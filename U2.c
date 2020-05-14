@@ -207,8 +207,6 @@ int main(int argc, char **argv)
     while (threads)
     {
         msleep(1);
-        if (timeSinceStarttime() - t > 51)
-            break;
     }
 
     close(fifo);

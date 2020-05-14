@@ -78,36 +78,6 @@ double timeSinceStarttime()
     return (double)(instant.tv_sec - startTime->tv_sec) * 1000.0f + (instant.tv_usec - startTime->tv_usec) / 1000.0f;
 }
 
-// void printRECVD(request *req)
-// {
-//     printf("%f ; %i ; %i ; %i ; %f ; %i ; RECVD\n", timeSinceStarttime(), req->i, req->pid, req->tid, req->dur, req->pl);
-//     fflush(stdout);
-// }
-
-// void printENTER(request *req)
-// {
-//     printf("%f ; %i ; %i ; %i ; %f ; %i ; ENTER\n", timeSinceStarttime(), req->i, req->pid, req->tid, req->dur, req->pl);
-//     fflush(stdout);
-// }
-
-// void printTIMUP(request *req)
-// {
-//     printf("%f ; %i ; %i ; %i ; %f ; %i ; TIMUP\n", timeSinceStarttime(), req->i, req->pid, req->tid, req->dur, req->pl);
-//     fflush(stdout);
-// }
-
-// void print2LATE(request *req)
-// {
-//     printf("%f ; %i ; %i ; %i ; %f ; %i ; 2LATE\n", timeSinceStarttime(), req->i, req->pid, req->tid, req->dur, req->pl);
-//     fflush(stdout);
-// }
-
-// void printGAVUP(request *req)
-// {
-//     printf("%f ; %i ; %i ; %i ; %f ; %i ; GAVUP\n", timeSinceStarttime(), req->i, req->pid, req->tid, req->dur, req->pl);
-//     fflush(stdout);
-// }
-
 void printRECVD(request *req)
 {
     printf("%li ; %i ; %i ; %i ; %f ; %i ; RECVD\n", time(NULL) - start, req->i, req->pid, req->tid, req->dur, req->pl);
@@ -171,6 +141,8 @@ int load_args(int argc, char **argv)
             arguments.fifoname = *argv;
         }
     }
+    if(arguments.nplaces < arguments.nthreads)
+	arguments.nthreads = arguments.nplaces;
     if (arguments.secs == 0)
     {
         printf("ERRO nos Parametros!\n");
@@ -181,7 +153,6 @@ int load_args(int argc, char **argv)
 
 long int place = 0;
 int *places;
-long int num_free_place = 0;
 
 int init(int argc, char **argv)
 {
@@ -198,6 +169,10 @@ int init(int argc, char **argv)
         perror("ERROR setting up FIFO on main() of Q.c ");
         return 1;
     }
+    for(int i=0;i<arguments.nplaces;i++){
+	places[i]=i;
+    }
+    place=arguments.nplaces-1;
     start = time(NULL);
     return 0;
 }
@@ -206,7 +181,7 @@ void *processRequest(void *input)
 {
     request local;
     memcpy(&local, input, sizeof(request));
-    free(input);
+    //free(input);
 
     char fifoLoad[599];
     sprintf(fifoLoad, "/tmp/%i.%i", local.pid, local.tid);
@@ -227,18 +202,14 @@ void *processRequest(void *input)
     pthread_mutex_lock(&place_mod);
     if (local.dur != -1)
     {
-        if (place <= arguments.nplaces)
+        if (place >= 0)
         {
-            local.pl = ++place;
-        }
-        else if (num_free_place > 0)
-        {
-            local.pl = places[--num_free_place];
+            local.pl = places[place--];
         }
         else
         {
             pthread_cond_wait(&pvar, &place_mod);
-            local.pl = places[--num_free_place];
+            local.pl = places[place--];
         }
     }
     pthread_mutex_unlock(&place_mod);
@@ -262,7 +233,7 @@ void *processRequest(void *input)
         pthread_mutex_unlock(&add_queue);
 
         pthread_mutex_lock(&place_mod);
-        places[num_free_place++] = local.pl;
+    	places[++place] = local.pl;
         pthread_cond_signal(&pvar);
         pthread_mutex_unlock(&place_mod);
 
@@ -293,7 +264,7 @@ void *processRequest(void *input)
     }
 
     pthread_mutex_lock(&place_mod);
-    places[num_free_place++] = local.pl;
+    places[++place] = local.pl;
     pthread_cond_signal(&pvar);
     pthread_mutex_unlock(&place_mod);
 
@@ -342,6 +313,13 @@ int main(int argc, char **argv)
     if (unlink(arguments.fifoname))
         fprintf(stderr, "Erro (com '%i'): %s\n", fifo, strerror(errno));
 
+    while (threads > 0)
+    {
+        pthread_mutex_lock(&t_queue);
+        pthread_cond_wait(&tvar, &t_queue);
+        pthread_mutex_unlock(&t_queue);
+    }
+
     while (read(fifo, &input, sizeof(input)) > 0)
     {
         fflush(stdout);
@@ -351,18 +329,15 @@ int main(int argc, char **argv)
         request *tmp_r = malloc(sizeof(request));
         memcpy(tmp_r, &input, sizeof(request));
         pthread_t t;
-
         pthread_mutex_lock(&t_queue);
         threads++;
         if (threads > arguments.nthreads)
             pthread_cond_wait(&tvar, &t_queue);
         pthread_mutex_unlock(&t_queue);
-
         while (pthread_create(&t, NULL, processRequest, tmp_r))
         {
         }
     }
-
     while (threads > 0)
     {
         pthread_mutex_lock(&t_queue);
@@ -370,8 +345,8 @@ int main(int argc, char **argv)
         pthread_mutex_unlock(&t_queue);
     }
 
-    free(places);
-    free(startTime);
+    //free(places);
+    //free(startTime);
     close(fifo);
     exit(0);
 }
