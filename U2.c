@@ -229,9 +229,6 @@ void *utilizador()
     //cria a struct request que vai ser enviada para o fifo
     request tmp = {i, getpid(), gettid(), dur, -1};
 
-    printIWANT(&tmp);
-    fflush(stdout);
-
     //cria o fifo privado
     int private_fifo;
     char fifo_name[599];
@@ -246,7 +243,7 @@ void *utilizador()
 
     if (!file_exists(arguments.fifoname) || write(fifo, &tmp, sizeof(request)) == -1)
     {
-        printFAILD(&tmp);
+        //printCLOSD(&tmp);
 
         if (unlink(fifo_name))
             fprintf(stderr, "Erro (com '%s'): %s\n", fifo_name, strerror(errno));
@@ -264,6 +261,10 @@ void *utilizador()
         pthread_mutex_unlock(&t_queue);
         out = 0;
         pthread_exit(NULL);
+    }
+    else{
+	printIWANT(&tmp);
+	fflush(stdout);
     }
 
     pthread_mutex_lock(&add_queue);
