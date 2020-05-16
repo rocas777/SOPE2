@@ -111,8 +111,8 @@ void printGAVUP(request *req)
 int load_args(int argc, char **argv)
 {
     arguments.secs = 0;
-    arguments.nplaces = __INT32_MAX__;
-    arguments.nthreads = 5000;
+    arguments.nplaces = 50000;
+    arguments.nthreads = 50000;
     arguments.fifoname = "";
     for (int i = 1; i < argc; i++)
     {
@@ -145,7 +145,6 @@ int load_args(int argc, char **argv)
 	arguments.nthreads = arguments.nplaces;
     if (arguments.secs == 0)
     {
-        printf("ERRO nos Parametros!\n");
         return 1;
     }
     return 0;
@@ -170,7 +169,7 @@ int init(int argc, char **argv)
         return 1;
     }
     for(int i=0;i<arguments.nplaces;i++){
-	places[i]=i;
+	places[i]=arguments.nplaces-i;
     }
     place=arguments.nplaces-1;
     start = time(NULL);
@@ -181,8 +180,11 @@ void *processRequest(void *input)
 {
     request local;
     memcpy(&local, input, sizeof(request));
-    //free(input);
+    bool outOfTime = false;
+    if(local.dur<0)
+	outOfTime = true;
 
+    local.dur = abs(local.dur);
     char fifoLoad[599];
     sprintf(fifoLoad, "/tmp/%i.%i", local.pid, local.tid);
     int tmp;
@@ -200,7 +202,7 @@ void *processRequest(void *input)
     }
 
     pthread_mutex_lock(&place_mod);
-    if (local.dur != -1)
+    if (!outOfTime)
     {
         if (place >= 0)
         {
@@ -217,7 +219,7 @@ void *processRequest(void *input)
     if ((((timeSinceStarttime()) / 1000) > arguments.secs))
     {
         local.pl = -1;
-        local.dur = -1;
+	outOfTime = true;
     }
 
     if (!file_exists(fifoLoad) || write(tmp, &local, sizeof(request)) == -1)
@@ -252,7 +254,7 @@ void *processRequest(void *input)
         pthread_cond_signal(&cvar);
     pthread_mutex_unlock(&add_queue);
 
-    if (local.dur != -1)
+    if (!outOfTime)
     {
         printENTER(&local);
         msleep(local.dur);
@@ -325,7 +327,7 @@ int main(int argc, char **argv)
         fflush(stdout);
         printRECVD(&input);
 
-        input.dur = -1;
+        input.dur = 0-input.dur;
         request *tmp_r = malloc(sizeof(request));
         memcpy(tmp_r, &input, sizeof(request));
         pthread_t t;
@@ -345,8 +347,6 @@ int main(int argc, char **argv)
         pthread_mutex_unlock(&t_queue);
     }
 
-    //free(places);
-    //free(startTime);
     close(fifo);
     exit(0);
 }

@@ -196,17 +196,23 @@ int main(int argc, char **argv)
             pthread_cond_wait(&tvar, &t_queue);
         pthread_mutex_unlock(&t_queue);
 
-        while ((err = pthread_create(&t, NULL, utilizador, NULL)))
-        {
-            msleep(1);
-        }
-        if (i > u)
-            u = i;
+	if(timeSinceStarttime() / 1000 <= arguments.secs){
+        	while ((err = pthread_create(&t, NULL, utilizador, NULL)))
+        	{
+        	    msleep(1);
+        	}
+        	if (i > u)
+        	    u = i;
+	}
+	else
+		break;
     }
 
-    while (threads)
+    while (threads>1)
     {
-        msleep(1);
+	pthread_mutex_lock(&t_queue);
+        	pthread_cond_wait(&tvar, &t_queue);
+        pthread_mutex_unlock(&t_queue);
     }
 
     close(fifo);
@@ -219,7 +225,7 @@ void *utilizador()
 {
     //gera tempo aleatório
     unsigned seed = time(NULL) + i;
-    int dur = rand_r(&seed) % 49 + 1;
+    int dur = rand_r(&seed) % 99 + 1;
 
     //incrementa o i, apenas um pode aceder de cada vez
     pthread_mutex_lock(&add_i);
@@ -241,7 +247,27 @@ void *utilizador()
         exit(errno);
     }
 
-    if (!file_exists(arguments.fifoname) || write(fifo, &tmp, sizeof(request)) == -1)
+
+    if (timeSinceStarttime() / 1000 >= arguments.secs)
+    {
+        if (unlink(fifo_name))
+            fprintf(stderr, "Erro (com '%s'): %s\n", fifo_name, strerror(errno));
+
+        pthread_mutex_lock(&add_queue);
+        arr_size--;
+        if (arr_size < 1000)
+            pthread_cond_signal(&cvar);
+        pthread_mutex_unlock(&add_queue);
+
+        pthread_mutex_lock(&t_queue);
+        threads--;
+        if (threads < 5000)
+            pthread_cond_signal(&tvar);
+        pthread_mutex_unlock(&t_queue);
+        out = 0;
+        pthread_exit(NULL);
+    }
+    else if (!file_exists(arguments.fifoname) || write(fifo, &tmp, sizeof(request)) == -1)
     {
         //printCLOSD(&tmp);
 
